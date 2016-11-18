@@ -180,7 +180,7 @@ impi_intel_linux_64 : obj = fds_impi_intel_linux_64
 impi_intel_linux_64 : setup $(obj_mpi)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_mpi)
 
-impi_intel_linux_64_db : FFLAGS = -m64 -mt_mpi -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency $(GITINFO) 
+impi_intel_linux_64_db : FFLAGS = -m64 -mt_mpi -check -warn all -O0 -auto -WB -traceback -g -fpe0 -fltconsistency $(GITINFO) 
 impi_intel_linux_64_db : LFLAGS = -static-intel
 impi_intel_linux_64_db : FCOMPL = mpiifort
 impi_intel_linux_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
@@ -212,7 +212,7 @@ mpi_intel_linux_64ib_scorep : obj = fds_mpi_intel_linux_64ib_scorep
 mpi_intel_linux_64ib_scorep : setup $(obj_mpi)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_mpi)
 
-intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_linux_64_db : FFLAGS = -m64 -check -warn all -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
 intel_linux_64_db : LFLAGS = -static-intel
 intel_linux_64_db : FCOMPL = ifort
 intel_linux_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
@@ -228,7 +228,7 @@ intel_linux_64_inspect : obj = fds_intel_linux_64_inspect -liomp5
 intel_linux_64_inspect : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
-mpi_intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency $(GITINFO) 
+mpi_intel_linux_64_db : FFLAGS = -m64 -check -warn all -O0 -auto -WB -traceback -g -fpe0 -fltconsistency $(GITINFO) 
 mpi_intel_linux_64_db : LFLAGS = -static-intel
 mpi_intel_linux_64_db : FCOMPL = mpifort
 mpi_intel_linux_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
@@ -431,6 +431,13 @@ gnu_win_64_db : obj = fds_gnu_win_64
 gnu_win_64_db : $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
+gnu_linux_32 : FFLAGS = -O3 $(GITINFOGNU)
+gnu_linux_32 : FCOMPL = gfortran
+gnu_linux_32 : FOPENMPFLAGS = -fopenmp
+gnu_linux_32 : obj = fds_gnu_linux_32
+gnu_linux_32 : $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+
 gnu_linux_64 : FFLAGS = -O3 $(GITINFOGNU)
 gnu_linux_64 : FCOMPL = gfortran
 gnu_linux_64 : FOPENMPFLAGS = -fopenmp
@@ -466,6 +473,13 @@ gnu_osx_64_db : obj     = fds_gnu_osx_64_db
 gnu_osx_64_db : $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
+mpi_gnu_linux_32 : FFLAGS = -O3 $(GITINFOGNU)
+mpi_gnu_linux_32 : FCOMPL = mpif90
+mpi_gnu_linux_32 : FOPENMPFLAGS = 
+mpi_gnu_linux_32 : obj = fds_mpi_gnu_linux_32
+mpi_gnu_linux_32 : setup $(obj_mpi) 
+	$(FCOMPL) $(FFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_mpi) 
+
 mpi_gnu_linux_64 : FFLAGS = -O3 $(GITINFOGNU)
 mpi_gnu_linux_64 : FCOMPL = mpifort
 mpi_gnu_linux_64 : FOPENMPFLAGS = 
@@ -473,7 +487,14 @@ mpi_gnu_linux_64 : obj = fds_mpi_gnu_linux_64
 mpi_gnu_linux_64 : setup $(obj_mpi) 
 	$(FCOMPL) $(FFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_mpi) 
 
-mpi_gnu_linux_64_db : FFLAGS = -O2 $(GITINFOGNU)
+mpi_gnu_linux_32_db : FFLAGS = -O0 -ggdb -Wall -Wline-truncation -Wcharacter-truncation -Wsurprising -Waliasing -fcheck=all -fbacktrace $(GITINFOGNU)
+mpi_gnu_linux_32_db : FCOMPL = mpif90
+mpi_gnu_linux_32_db : FOPENMPFLAGS = 
+mpi_gnu_linux_32_db : obj = fds_mpi_gnu_linux_32_db
+mpi_gnu_linux_32_db : setup $(obj_mpi) 
+	$(FCOMPL) $(FFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_mpi) 
+
+mpi_gnu_linux_64_db : FFLAGS = -O2 -ggdb -Wall -Wline-truncation -Wcharacter-truncation -Wsurprising -Waliasing -fcheck=all -fbacktrace $(GITINFOGNU)
 mpi_gnu_linux_64_db : FCOMPL = mpifort
 mpi_gnu_linux_64_db : FOPENMPFLAGS = 
 mpi_gnu_linux_64_db : obj = fds_mpi_gnu_linux_64_db
