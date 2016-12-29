@@ -2535,23 +2535,23 @@ DO N=1,N_TRACKED_SPECIES
    ENDDO
    ITMP = NINT(TMPA)
    WRITE(LU_OUTPUT,'(A)') ' '
-   WRITE(LU_OUTPUT,'(A,ES9.2)')  '   Viscosity (kg/m/s)   Ambient (293 K): ', MU_RSQMW_Z(ITMP,N)/RSQ_MW_Z(N)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES9.2)')  '     Viscosity (kg/m/s) Ambient, ',ITMP,' K: ', MU_RSQMW_Z(ITMP,N)/RSQ_MW_Z(N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                  500 K: ', MU_RSQMW_Z( 500,N)/RSQ_MW_Z(N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1000 K: ', MU_RSQMW_Z(1000,N)/RSQ_MW_Z(N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1500 K: ', MU_RSQMW_Z(1500,N)/RSQ_MW_Z(N)
-   WRITE(LU_OUTPUT,'(A,ES9.2)')  '   Therm. Cond. (W/m/K) Ambient (293 K): ', K_RSQMW_Z(ITMP,N)/RSQ_MW_Z(N)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES9.2)')  '   Therm. Cond. (W/m/K) Ambient, ',ITMP,' K: ', K_RSQMW_Z(ITMP,N)/RSQ_MW_Z(N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                  500 K: ', K_RSQMW_Z( 500,N)/RSQ_MW_Z(N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1000 K: ', K_RSQMW_Z(1000,N)/RSQ_MW_Z(N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1500 K: ', K_RSQMW_Z(1500,N)/RSQ_MW_Z(N)
-   WRITE(LU_OUTPUT,'(A,ES9.2)')  '        Enthalpy (J/kg) Ambient (293 K): ', CPBAR_Z(ITMP,N)*TMPA
+   WRITE(LU_OUTPUT,'(A,I4,A,ES9.2)')  '        Enthalpy (J/kg) Ambient, ',ITMP,' K: ', CPBAR_Z(ITMP,N)*TMPA
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                  500 K: ', CPBAR_Z(ITMP,N)*500._EB
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1000 K: ', CPBAR_Z(ITMP,N)*1000._EB
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1500 K: ', CPBAR_Z(ITMP,N)*1500._EB
-   WRITE(LU_OUTPUT,'(A,ES9.2)')  '   Spec. Heat (J/kg/K)  Ambient (293 K): ', CP_Z(ITMP,N)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES9.2)')  '    Spec. Heat (J/kg/K) Ambient, ',ITMP,' K: ', CP_Z(ITMP,N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                  500 K: ', CP_Z( 500,N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1000 K: ', CP_Z(1000,N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1500 K: ', CP_Z(1500,N)
-   WRITE(LU_OUTPUT,'(A,ES9.2)')  '   Diff. Coeff. (m^2/s) Ambient (293 K): ', D_Z(ITMP,N)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES9.2)')  '   Diff. Coeff. (m^2/s) Ambient, ',ITMP,' K: ', D_Z(ITMP,N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                  500 K: ', D_Z( 500,N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1000 K: ', D_Z(1000,N)
    WRITE(LU_OUTPUT,'(A,ES9.2)')  '                                 1500 K: ', D_Z(1500,N)
@@ -5335,8 +5335,9 @@ IND_SELECT: SELECT CASE(IND)
    CASE(12)  ! H
       GAS_PHASE_OUTPUT_RES = H(II,JJ,KK)
    CASE(13)  ! MIXTURE FRACTION
-      GAS_PHASE_OUTPUT_RES = ZZ(II,JJ,KK,REACTION(1)%FUEL_SMIX_INDEX)+ZZ(II,JJ,KK,Z_INDEX)* &
-      SPECIES_MIXTURE(REACTION(1)%FUEL_SMIX_INDEX)%MW/(SPECIES_MIXTURE(Z_INDEX)%MW*REACTION(1)%NU(Z_INDEX))
+      ! requires FUEL + AIR --> PROD (SIMPLE_CHEMISTRY)
+      ! f = Z_FUEL + Z_PROD/(1+S), where S is the mass stoichiometric coefficient for AIR
+      GAS_PHASE_OUTPUT_RES = ZZ(II,JJ,KK,REACTION(1)%FUEL_SMIX_INDEX)+ZZ(II,JJ,KK,REACTION(1)%N_SMIX)/(1._EB+REACTION(1)%S)
    CASE(14)  ! DIVERGENCE
       GAS_PHASE_OUTPUT_RES = D(II,JJ,KK)
    CASE(15)  ! MIXING TIME
@@ -5882,14 +5883,12 @@ IND_SELECT: SELECT CASE(IND)
    CASE(139) ! H PRIME
       GAS_PHASE_OUTPUT_RES = H_PRIME(II,JJ,KK)
 
-   CASE(140) ! F_X
+   CASE(140) ! FVX_B
       GAS_PHASE_OUTPUT_RES = FVX_B(II,JJ,KK)
-   CASE(141) ! F_Y
+   CASE(141) ! FVY_B
       GAS_PHASE_OUTPUT_RES = FVY_B(II,JJ,KK)
-   CASE(142) ! F_Z
+   CASE(142) ! FVZ_B
       GAS_PHASE_OUTPUT_RES = FVZ_B(II,JJ,KK)
-   CASE(143) ! BAROCLINIC LIMITER
-      GAS_PHASE_OUTPUT_RES = BLIM(II,JJ,KK)
 
    CASE(154:155) ! TRANSMISSION, PATH OBSCURATION
       EXT_COEF   = 0._EB
@@ -7964,7 +7963,7 @@ REAL(EB) :: TNOW
 TNOW = SECOND()
 
 IF (PARTICLE_FILE) THEN
-   INQUIRE(UNIT=LU_MASS,OPENED=OPN)
+   INQUIRE(UNIT=LU_PART(NM),OPENED=OPN)
    IF (OPN) FLUSH(LU_PART(NM))
 ENDIF
 

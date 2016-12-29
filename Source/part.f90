@@ -456,7 +456,6 @@ SPRINKLER_INSERT_LOOP: DO KS=1,N_DEVC
    ! Compute weighting factor for the PARTICLEs just inserted
 
    IF (DROP_SUM > 0) THEN
-      !PWT0 = FLOW_RATE*(T-DV%T)/MASS_SUM
       PWT0 = LPC%N_STRATA*FLOW_RATE/(LPC%DENSITY*LPC%MEAN_DROPLET_VOLUME*REAL(PY%PARTICLES_PER_SECOND,EB))/D_PRES_FACTOR**3
       DO I=1,N_INSERT
          N = LP_INDEX_LOOKUP(I)
@@ -828,7 +827,10 @@ VOLUME_INSERT_LOOP: DO IB=1,N_INIT
          DO JJ=J1,J2
             II_LOOP: DO II=I1,I2
                IF (SOLID(CELL_INDEX(II,JJ,KK))) CYCLE II_LOOP
-               INSERT_VOLUME = INSERT_VOLUME + DX(II)*DY(JJ)*DZ(KK)
+            !  INSERT_VOLUME = INSERT_VOLUME + DX(II)*DY(JJ)*DZ(KK)
+               INSERT_VOLUME = INSERT_VOLUME + (MIN(X(II),IN%X2)-MAX(X(II-1),IN%X1)) &
+                                             * (MIN(Y(JJ),IN%Y2)-MAX(Y(JJ-1),IN%Y1)) &
+                                             * (MIN(Z(KK),IN%Z2)-MAX(Z(KK-1),IN%Z1))
                INSERT_PARTICLE_LOOP_2: DO I = 1, IN%N_PARTICLES_PER_CELL
                   N_INSERT = N_INSERT + 1
                   IF (N_INSERT > MAXIMUM_PARTICLES) THEN
