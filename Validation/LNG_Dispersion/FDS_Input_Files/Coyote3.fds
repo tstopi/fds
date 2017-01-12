@@ -7,7 +7,7 @@
 
 &TIME T_BEGIN=-200., T_END=200. /
 
-&MISC U0=1., MEAN_FORCING(1)=.TRUE., RAMP_U0_Z='u profile', RAMP_TMP0_Z='T profile', DT_MEAN_FORCING=1., TMPA=37.1, P_INF=94840, HUMIDITY=11.3, PROCESS_ALL_MESHES=.TRUE.  /
+&MISC U0=1., MEAN_FORCING(1)=.TRUE., RAMP_U0_Z='u profile', RAMP_TMP0_Z='T profile', DT_MEAN_FORCING=1., TMPA=39.55, P_INF=93600, HUMIDITY=11.3, PROCESS_ALL_MESHES=.TRUE.  /
 
 &RAMP ID='u profile', Z= 0.001 , F= 1.0987  /
 &RAMP ID='u profile', Z= 0.100 , F= 4.2039  /
@@ -159,5 +159,8 @@
 &DEVC ID      ='G21a01'       ,       XYZ=    432.3   ,       -251.4  ,       1       ,       QUANTITY='VOLUME FRACTION'      ,        SPEC_ID='METHANE' /
 &DEVC ID      ='G21a03'       ,       XYZ=    432.3   ,       -251.4  ,       3       ,       QUANTITY='VOLUME FRACTION'      ,        SPEC_ID='METHANE' /
 &DEVC ID      ='G21a08'       ,       XYZ=    432.3   ,       -251.4  ,       8       ,       QUANTITY='VOLUME FRACTION'      ,        SPEC_ID='METHANE' /
+
+&DEVC ID='u', QUANTITY='VELOCITY',    POINTS=60, XB=300,300,125,125,0.2,31, Z_ID='z' /
+&DEVC ID='T', QUANTITY='TEMPERATURE', POINTS=60, XB=300,300,125,125,0.2,31, HIDE_COORDINATES=.TRUE. /
 
 &TAIL /

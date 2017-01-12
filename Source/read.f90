@@ -199,10 +199,11 @@ END SUBROUTINE READ_DEAD
 
 SUBROUTINE READ_HEAD
 INTEGER :: NAMELENGTH
-NAMELIST /HEAD/ CHID,FYI,TITLE
+NAMELIST /HEAD/ CHID,FYI,STOPFDS,TITLE
 
 CHID    = 'null'
 TITLE   = '      '
+STOPFDS=-1
 
 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
 HEAD_LOOP: DO
@@ -239,6 +240,12 @@ IF (EX) THEN
       CALL SHUTDOWN(MESSAGE) ; RETURN
    ELSE
       WRITE(LU_ERR,'(A,A,A)') "NOTE: The file, ",TRIM(FN_STOP),", was detected."
+      WRITE(LU_ERR,'(A,I5,A)')"This FDS run will stop after ",STOP_AT_ITER," iterations."
+   ENDIF
+ELSE
+   IF(STOPFDS>=0) THEN
+      STOP_AT_ITER = STOPFDS
+      WRITE(LU_ERR,'(A,A,A)') "NOTE: The STOPFDS keyword was detected on the &HEAD line."
       WRITE(LU_ERR,'(A,I5,A)')"This FDS run will stop after ",STOP_AT_ITER," iterations."
    ENDIF
 ENDIF
@@ -3111,7 +3118,8 @@ RHOA = P_INF/(TMPA*RSUM0)
 
 ! Compute constant-temperature specific heats
 
-CP_GAMMA = SPECIES_MIXTURE(1)%RCON*GAMMA/(GAMMA-1._EB)
+GM1OG = (GAMMA-1._EB)/GAMMA
+CP_GAMMA = SPECIES_MIXTURE(1)%RCON/GM1OG
 CPOPR = CP_GAMMA/PR
 
 ! Compute gas properties for primitive species 1 to N_SPECIES.

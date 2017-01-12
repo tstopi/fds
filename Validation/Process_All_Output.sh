@@ -8,12 +8,12 @@ PROCESS()
   nout=`ls -l Current_Results/*.out |& grep -v cannot | wc -l`
   nfds=`ls -l Current_Results/*.fds |& grep -v cannot | wc -l`
   nsuccess=`tail Current_Results/*.out |& grep successfully | wc -l`
-  status="cases not run"
+  status="***error: $case cases not run"
   if [ $nfds -gt 0 ] && [ $nfds -gt $nout ]; then
-    status="some cases not run or not complete"
+    status="***error: some $case cases did not run or are not complete"
   else
     if [ $nout -gt 0 ] && [ $nout -gt $nsuccess ]; then
-      status="some cases failed"
+      status="some $case cases failed"
     else
       if [ $nout -gt 0 ] ; then
       status="processing output"
@@ -48,6 +48,7 @@ PROCESS DelCo_Trainers
 PROCESS FAA_Cargo_Compartments
 PROCESS FAA_Polymers
 PROCESS Fleury_Heat_Flux
+PROCESS FM_FPRF_Datacenter
 PROCESS FM_Parallel_Panels
 PROCESS FM_SNL
 PROCESS Hamins_Gas_Burners
@@ -55,6 +56,7 @@ PROCESS Harrison_Spill_Plumes
 PROCESS Heskestad_Flame_Height
 PROCESS LEMTA_Spray
 PROCESS LLNL_Enclosure
+PROCESS LNG_Dispersion
 PROCESS McCaffrey_Plume
 PROCESS Moody_Chart
 PROCESS MPI_Scaling_Tests
