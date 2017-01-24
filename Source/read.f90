@@ -1890,6 +1890,9 @@ IF (TRIM(EXTINCTION_MODEL)/='null') THEN
       CASE ('EXTINCTION 4')
          ! Vaidya Sankaran, UTRC, 2014
          EXTINCT_MOD = EXTINCTION_4
+      CASE ('EXTINCTION 5')
+         !Two-step fuel -> CO, CO-> CO2
+         EXTINCT_MOD = EXTINCTION_5
       CASE DEFAULT
          WRITE(MESSAGE,'(A,A,A)') 'ERROR: EXTINCTION_MODEL, ',TRIM(EXTINCTION_MODEL),', is not recognized.'
          CALL SHUTDOWN(MESSAGE) ; RETURN
@@ -9089,7 +9092,6 @@ MESH_LOOP_1: DO NM=1,NMESHES
       SPREAD_RATE = -1._EB
       TMP_EXTERIOR = -1000.
       TMP_EXTERIOR_RAMP = 'null'
-      REJECT_VENT  = .FALSE.
       TEXTURE_ORIGIN = -999._EB
       OUTLINE      = .FALSE.
       DEVC_ID  = 'null'
@@ -9121,6 +9123,8 @@ MESH_LOOP_1: DO NM=1,NMESHES
       ELSE
          SURF_ID = 'MIRROR'
       ENDIF
+
+      IF (MESH_ID/='null' .AND. MESH_ID/=MESH_NAME(NM))  CYCLE READ_VENT_LOOP
 
       IF (PBX>-1.E5_EB .OR. PBY>-1.E5_EB .OR. PBZ>-1.E5_EB) THEN
          IF (MULT_ID/='null') THEN
@@ -9174,8 +9178,6 @@ MESH_LOOP_1: DO NM=1,NMESHES
 
       ! Check that the vent is properly specified
 
-      IF (MESH_ID/='null' .AND. MESH_ID/=MESH_NAME(NM))  REJECT_VENT = .TRUE.
-
       IF (ABS(XB(3)-XB(4))<=SPACING(XB(4))  .AND. TWO_D .AND. NN<N_VENT_O-1) THEN
          IF (ID=='null')WRITE(MESSAGE,'(A,I4,A)')'ERROR: VENT ',NN,      ' cannot be specified on a y boundary in a 2D calculation'
          IF (ID/='null')WRITE(MESSAGE,'(A,A,A)') 'ERROR: VENT ',TRIM(ID),' cannot be specified on a y boundary in a 2D calculation'
@@ -9205,6 +9207,8 @@ MESH_LOOP_1: DO NM=1,NMESHES
       K_MULT_LOOP: DO KK=MR%K_LOWER,MR%K_UPPER
          J_MULT_LOOP: DO JJ=MR%J_LOWER,MR%J_UPPER
             I_MULT_LOOP: DO II=MR%I_LOWER,MR%I_UPPER
+
+               REJECT_VENT = .FALSE.
 
                IF (.NOT.MR%SEQUENTIAL) THEN
                   XB1 = XB(1) + MR%DX0 + II*MR%DXB(1)
