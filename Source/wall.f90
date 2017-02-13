@@ -37,7 +37,7 @@ TNOW=SECOND()
 CALL POINT_TO_MESH(NM)
 
 CALL DIFFUSIVITY_BC
-CALL THERMAL_BC(T,DT,NM)
+CALL THERMAL_BC(T,NM)
 IF (DEPOSITION .AND. .NOT.INITIALIZATION_PHASE) CALL CALC_DEPOSITION(DT,NM)
 IF (SOOT_OXIDATION) CALL SURFACE_OXIDATION(DT,NM)
 IF (HVAC_SOLVE .AND. .NOT.INITIALIZATION_PHASE) CALL HVAC_BC
@@ -188,15 +188,15 @@ ENDDO WALL_LOOP
 END SUBROUTINE DIFFUSIVITY_BC
 
 
-SUBROUTINE THERMAL_BC(T,DT,NM)
+SUBROUTINE THERMAL_BC(T,NM)
 
 ! Thermal boundary conditions for adiabatic, fixed temperature, fixed flux and interpolated boundaries.
 ! One dimensional heat transfer and pyrolysis is done in PYROLYSIS, which is called at the end of this routine.
 
 USE MATH_FUNCTIONS, ONLY: EVALUATE_RAMP
 USE PHYSICAL_FUNCTIONS, ONLY : GET_SPECIFIC_GAS_CONSTANT,GET_SPECIFIC_HEAT,GET_VISCOSITY
-REAL(EB), INTENT(IN) :: T,DT
-REAL(EB) :: DT_BC,DTMP
+REAL(EB), INTENT(IN) :: T
+REAL(EB) :: DT_BC,DTMP,DT_BC_HT3D
 INTEGER  :: SURF_INDEX,IW,IP
 INTEGER, INTENT(IN) :: NM
 REAL(EB), POINTER, DIMENSION(:,:) :: PBAR_P
@@ -271,9 +271,18 @@ IF (SOLID_PARTICLES) THEN
    ENDDO
 ENDIF
 
-! *********************** UNDER CONSTRUCTION *************************
-IF (SOLID_HT3D .AND. CORRECTOR) CALL SOLID_HEAT_TRANSFER_3D(T)
-! ********************************************************************
+! *********************** UNDER CONSTRUCTION **************************
+! Note: With HT3D called after PRYOLYSIS, HT3D inherits the PYRO TMP_F
+IF (.NOT.INITIALIZATION_PHASE .AND. SOLID_HT3D .AND. CORRECTOR) THEN
+   WALL_COUNTER_HT3D = WALL_COUNTER_HT3D + 1
+   IF (WALL_COUNTER_HT3D==WALL_INCREMENT_HT3D) THEN
+      DT_BC_HT3D    = T - BC_CLOCK_HT3D
+      BC_CLOCK_HT3D = T
+      CALL SOLID_HEAT_TRANSFER_3D
+      WALL_COUNTER_HT3D = 0
+   ENDIF
+ENDIF
+! *********************************************************************
 
 
 CONTAINS
@@ -666,15 +675,15 @@ END SELECT METHOD_OF_HEAT_TRANSFER
 END SUBROUTINE HEAT_TRANSFER_BC
 
 
-SUBROUTINE SOLID_HEAT_TRANSFER_3D(T)
+SUBROUTINE SOLID_HEAT_TRANSFER_3D
 
 ! Solves the 3D heat conduction equation internal to OBSTs.
 ! Currently, this is not hooked into PYROLYSIS shell elements,
 ! but this is under development.
 
-REAL(EB), INTENT(IN) :: T
+!REAL(EB), INTENT(IN) :: T
 REAL(EB) :: DT_SUB,T_LOC,RHO_S,K_S,C_S,TMP_G,TMP_F,TMP_S,RDN,HTC,K_S_M,K_S_P,H_S,T_IGN,AREA_ADJUST,TMP_OTHER,RAMP_FACTOR,&
-            QNET,TSI,FDERIV,QEXTRA,K_S_MAX,VN_HT3D
+            QNET,TSI,FDERIV,QEXTRA,K_S_MAX,VN_HT3D,DN,KDTDN
 INTEGER  :: II,JJ,KK,I,J,K,IOR,IC,ICM,ICP,IIG,JJG,KKG,NR,ADCOUNT,SUBIT
 REAL(EB), POINTER, DIMENSION(:,:,:) :: KDTDX=>NULL(),KDTDY=>NULL(),KDTDZ=>NULL(),TMP_NEW=>NULL()
 TYPE(OBSTRUCTION_TYPE), POINTER :: OB=>NULL(),OBM=>NULL(),OBP=>NULL()
@@ -696,12 +705,12 @@ KDTDY=>WORK2; KDTDY=0._EB
 KDTDZ=>WORK3; KDTDZ=0._EB
 TMP_NEW=>WORK4; TMP_NEW=TMP
 
-DT_SUB = DT
+DT_SUB = DT_BC_HT3D
 T_LOC = 0._EB
 SUBIT = 0
 
-SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT)>TWO_EPSILON_EB )
-   DT_SUB = MIN(DT_SUB,DT-T_LOC)
+SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT_BC_HT3D)>TWO_EPSILON_EB )
+   DT_SUB = MIN(DT_SUB,DT_BC_HT3D-T_LOC)
    K_S_MAX = 0._EB
    VN_HT3D = 0._EB
 
@@ -821,13 +830,13 @@ SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT)>TWO_EPSILON_EB )
          K_S = ML%K_S
       ELSE
          NR = -NINT(ML%K_S)
-         K_S = EVALUATE_RAMP(TMP(II,JJ,KK),0._EB,NR)
+         K_S = EVALUATE_RAMP(WC%ONE_D%TMP_F,0._EB,NR)
       ENDIF
       K_S_MAX = MAX(K_S_MAX,K_S)
 
       METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
 
-         CASE (SPECIFIED_TEMPERATURE) METHOD_OF_HEAT_TRANSFER
+         CASE DEFAULT METHOD_OF_HEAT_TRANSFER ! includes SF%THERMAL_BC_INDEX==SPECIFIED_TEMPERATURE
 
             SELECT CASE(IOR)
                CASE( 1); KDTDX(II,JJ,KK)   = K_S * 2._EB*(WC%ONE_D%TMP_F-TMP(II,JJ,KK))*RDX(II)
@@ -839,7 +848,7 @@ SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT)>TWO_EPSILON_EB )
             END SELECT
 
          CASE (NET_FLUX_BC) METHOD_OF_HEAT_TRANSFER ! copied from HEAT_TRANSFER_BC
-            
+
             AREA_ADJUST = WC%ONE_D%AREA_ADJUST
             SELECT CASE(IOR)
                CASE( 1); KDTDX(II,JJ,KK)   = -SF%NET_HEAT_FLUX*AREA_ADJUST
@@ -900,7 +909,35 @@ SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT)>TWO_EPSILON_EB )
                WC%ONE_D%QCONF = HTC*DTMP
             ENDIF SOLID_PHASE_ONLY_IF
 
-         CASE DEFAULT ! thermally thick
+         CASE (THERMALLY_THICK) ! TMP_F and HEAT FLUX taken from PYROLYSIS
+
+            TMP_F = WC%ONE_D%TMP_F
+            TMP_S = WC%ONE_D%TMP(1)
+            DN    = ABS( 0.5_EB*(WC%ONE_D%X(0)-WC%ONE_D%X(1)) ) ! ABS required because X is a "depth"
+            HTC   = K_S / DN
+            KDTDN = HTC * (TMP_F-TMP_S)
+
+            SELECT CASE(IOR)
+               CASE( 1); KDTDX(II,JJ,KK)   =  KDTDN
+               CASE(-1); KDTDX(II-1,JJ,KK) = -KDTDN
+               CASE( 2); KDTDY(II,JJ,KK)   =  KDTDN
+               CASE(-2); KDTDY(II,JJ-1,KK) = -KDTDN
+               CASE( 3); KDTDZ(II,JJ,KK)   =  KDTDN
+               CASE(-3); KDTDZ(II,JJ,KK-1) = -KDTDN
+            END SELECT
+
+            ! check time step
+
+            IF (ML%C_S>0._EB) THEN
+               C_S = ML%C_S
+            ELSE
+               NR = -NINT(ML%C_S)
+               C_S = EVALUATE_RAMP(TMP_F,0._EB,NR)
+            ENDIF
+            RHO_S = ML%RHO_S
+            VN_HT3D = MAX( VN_HT3D, HTC/(RHO_S*C_S*DN) )
+
+         CASE (THERMALLY_THICK_HT3D) ! thermally thick, continuous heat flux, not connected with PYROLYSIS
 
             IIG = WC%ONE_D%IIG
             JJG = WC%ONE_D%JJG
