@@ -630,7 +630,7 @@ SUBROUTINE INSERT_VOLUMETRIC_PARTICLES
 
 ! Loop over all INIT lines and look for particles inserted within a specified volume
 
-INTEGER :: IIP,ND,N_INSERT,I1,J1,K1,I2,J2,K2,MOD_N_INSERT,N,N_PARTICLES_INSERT
+INTEGER :: IIP,N_INSERT,I1,J1,K1,I2,J2,K2,N,N_PARTICLES_INSERT
 REAL(EB) :: XC1,XC2,YC1,YC2,ZC1,ZC2,X0,Y0,Z0,RR,HH,INSERT_VOLUME,INPUT_VOLUME,LP_X,LP_Y,LP_Z
 
 VOLUME_INSERT_LOOP: DO IB=1,N_INIT
@@ -1067,7 +1067,7 @@ IF (LPC%SOLID_PARTICLE) THEN
                LP%ONE_D%AREA = LP_VOLUME/SF%THICKNESS
                IF (SF%THERMALLY_THICK) THEN
                   DO N=1,SF%N_LAYERS
-                     LP%MASS = LP%MASS + AREA*SF%LAYER_THICKNESS(N)*SF%LAYER_DENSITY(N)
+                     LP%MASS = LP%MASS + SF%LAYER_THICKNESS(N)*SF%LAYER_DENSITY(N)
                   END DO
                   LP%MASS = LP%MASS*LP%ONE_D%AREA
                ENDIF
@@ -1084,7 +1084,7 @@ IF (LPC%SOLID_PARTICLE) THEN
                ENDIF
             CASE (SURF_SPHERICAL)
                LP%ONE_D%AREA = 3._EB*LP_VOLUME/SF%THICKNESS
-               LP%PWT = AREA/(4._EB*PI*SF%THICKNESS**2)
+               LP%PWT = LP%ONE_D%AREA/(4._EB*PI*SF%THICKNESS**2)
                IF (SF%THERMALLY_THICK) THEN
                   X1 = SUM(SF%LAYER_THICKNESS)
                   DO N=SF%N_LAYERS,1,-1
@@ -1280,9 +1280,9 @@ PARTICLE_LOOP: DO IP=1,NLP
 
    ! Determine the limiting time step to ensure particle does not traverse more than a single grid cell
 
-   DT_CFL = MIN(DX(LP%ONE_D%IIG)/(ABS(LP%U)+EPSILON_EB),&
-                DY(LP%ONE_D%JJG)/(ABS(LP%V)+EPSILON_EB),&
-                DZ(LP%ONE_D%KKG)/(ABS(LP%W)+EPSILON_EB))
+   DT_CFL = MIN(DX(LP%ONE_D%IIG)/(ABS(LP%U)+TWO_EPSILON_EB),&
+                DY(LP%ONE_D%JJG)/(ABS(LP%V)+TWO_EPSILON_EB),&
+                DZ(LP%ONE_D%KKG)/(ABS(LP%W)+TWO_EPSILON_EB))
    N_ITER = CEILING(DT/DT_CFL)
    DT_P   = DT/REAL(N_ITER,EB)
 
@@ -3670,6 +3670,7 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
       CALL GET_SPECIFIC_HEAT(ZZ_GET,CP,TMP(II,JJ,KK))
       H_G = CP * TMP(II,JJ,KK) * M_GAS
       TMP_DROP = LP%ONE_D%TMP(1)
+      TMP_DROP_NEW = TMP_DROP
       R_DROP = LP%ONE_D%X(1)
       M_DROP = LPC%FTPR * R_DROP**3
       A_DROP = 4._EB*PI * R_DROP**2
@@ -3749,8 +3750,14 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
          D_M_VAP = MIN(M_DROP_NEW,(H_L_NEW - M_DROP_NEW*TMP_DROP_NEW*C_DROP)/H_V)
          M_VAP = M_VAP + D_M_VAP
          M_DROP_NEW = M_DROP_NEW - D_M_VAP
+         IF (M_DROP_NEW <= TWO_EPSILON_EB) THEN
+            H_L_NEW = 0._EB
+         ELSE
+            H_L_NEW = M_DROP_NEW*TMP_DROP_NEW*C_DROP
+         ENDIF
       ENDIF
 
+      LP%M_DOT = M_VAP/DT
       H_L_NEW = H_L_NEW*LP%PWT
       M_VAP = M_VAP * LP%PWT
       M_VAPOR(II,JJ,KK) = M_VAPOR(II,JJ,KK) + M_VAP
@@ -3765,7 +3772,6 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
       Q_CON_GAS = H_L_NEW - H_L - Q_D_1 + M_VAP * (H_V + H_L_OLD)
       D_SOURCE(II,JJ,KK) = D_SOURCE(II,JJ,KK) + (MW_RATIO*M_VAP/M_GAS + (M_VAP*(H_S_B - H_S) - Q_CON_GAS)/H_G) / DT
       M_DOT_PPP(II,JJ,KK,Z_INDEX) = M_DOT_PPP(II,JJ,KK,Z_INDEX) + M_VAP*RVC/DT
-      LP%M_DOT = M_VAP/DT
 
       ! Add stability checks
 
@@ -4038,7 +4044,7 @@ SUBROUTINE PARTICLE_ORPHANAGE
 ! Determine if the given particle is now in another mesh, and if so, assign it to the ORPHAN array.
 
 USE MEMORY_FUNCTIONS, ONLY: REALLOCATE_STORAGE_ARRAYS
-INTEGER :: OM,NOM,TAG,N_NEW_STORAGE_SLOTS
+INTEGER :: OM,NOM,N_NEW_STORAGE_SLOTS
 TYPE (MESH_TYPE), POINTER :: M=>NULL()
 TYPE (OMESH_TYPE), POINTER :: M2=>NULL()
 
