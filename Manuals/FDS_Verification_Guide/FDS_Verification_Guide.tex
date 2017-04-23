@@ -1147,7 +1147,7 @@ Norm & $\rho$ & $Z$ & $u$ & $H$ \\
 
 \textbf{Howard R. Baum, NIST Fellow Emeritus}\\
 
-\noindent This problem describes the collapse of a hot layer of depth $d$ adjacent to a wall at plane $y=0$ in zero gravity.  The wall is presumed to remain cool at the ambient temperature $T_0$ while the hot layer is initially $T_h$.  The initial velocity field is quiescent.  Starting at time $t=0$ the hot layer begins to diffuse into the upper cool ambient atmosphere and to expand due to dilitation.  There is also heat transfer to the wall.  The problem is 1D in the spatial coordinate $y$ and time dependent.  We are interested in the evolution of the temperature $T(y,t)$ and the velocity $v(y,t)$.
+\noindent This problem describes the collapse of a hot layer of depth $d$ adjacent to a wall at plane $y=0$ in zero gravity.  The wall is presumed to remain cool at the ambient temperature $T_0$ while the hot layer is initially $T_h$.  The initial velocity field is quiescent.  Starting at time $t=0$ the hot layer begins to diffuse into the upper cool ambient atmosphere and to expand due to dilatation.  There is also heat transfer to the wall.  The problem is 1D in the spatial coordinate $y$ and time dependent.  We are interested in the evolution of the temperature $T(y,t)$ and the velocity $v(y,t)$.
 
 For the present problem the governing equations are
 \begin{gather}
@@ -2814,7 +2814,7 @@ The species evolutions for the two-step 1.75 order reaction mechanism are shown 
 with the following reaction input parameters:
 \begin{table}[ht]
 \begin{center}
-\caption[Arrhenius values for a two-step reversible C$_3$H$_8$ reaction]{Arrhenius values for a two-step reverisble C$_3$H$_8$ reaction; $\alpha$ = [$\mathrm{C_3H_8}$ $\mathrm{O_2}$ $\mathrm{CO}$ $\mathrm{H_2O}$ $\mathrm{CO_2}$].}
+\caption[Arrhenius values for a two-step reversible C$_3$H$_8$ reaction]{Arrhenius values for a two-step reversible C$_3$H$_8$ reaction; $\alpha$ = [$\mathrm{C_3H_8}$ $\mathrm{O_2}$ $\mathrm{CO}$ $\mathrm{H_2O}$ $\mathrm{CO_2}$].}
 \label{two_step_rev_c3h8}
 \begin{tabular}{|l|l|l|l|l|l|l|l|l|}
 \hline Reaction & $\nu_{\alpha}$ & E (kJ/kmol) & A (cm$^3$/mole/s) & $a_{\alpha}$ & $n_{\alpha}$  \\ \hline \hline
@@ -2845,7 +2845,7 @@ Note: the values of $E$ and $A$ used in these examples are not necessarily repre
 To couple verification of species mass fraction, compartment temperature, and compartment pressure, an equilibrium example problem was setup. In this case, we examine a sealed box filled with a stoichiometric mixture of fuel, oxygen, and nitrogen. The two-step reversible reaction mechanism, Eqs.~(\ref{eq:2step_propane_rev_a})-(\ref{eq:2step_propane_rev_c}), is used to drive the FDS simulation. The initial temperature is set to 350 \si{\degree C} to ensure the reaction occurs in a timely manner. The reaction rate parameters in the table below are based off values in literature from Westbrook and Dryer \cite{Westbrook:1}.
 \begin{table}[ht]
 \begin{center}
-\caption[Arrhenius values for a two-step reversible C$_3$H$_8$ reaction]{Arrhenius values for a two-step reverisble C$_3$H$_8$ reaction for equilibrium; $\alpha$ = [$\mathrm{C_3H_8}$ $\mathrm{O_2}$ $\mathrm{CO}$ $\mathrm{H_2O}$ $\mathrm{CO_2}$].}
+\caption[Arrhenius values for a two-step reversible C$_3$H$_8$ reaction]{Arrhenius values for a two-step reversible C$_3$H$_8$ reaction for equilibrium; $\alpha$ = [$\mathrm{C_3H_8}$ $\mathrm{O_2}$ $\mathrm{CO}$ $\mathrm{H_2O}$ $\mathrm{CO_2}$].}
 \label{two_step_eq_rev_c3h8}
 \begin{tabular}{|l|l|l|l|l|l|l|l|l|}
 \hline Reaction & $\nu_{\alpha}$ & E (kJ/kmol) & A (cm$^3$/mole/s) & $a_{\alpha}$ & $n_{\alpha}$  \\ \hline \hline
@@ -3489,10 +3489,21 @@ This section presents test cases for solid phase heat diffusion (conduction) in 
 
 \subsection{1D Heat Diffusion in a Square Bar (\texorpdfstring{\textct{ht3d\_nx\_x}}{ht3d\_nx\_x})}
 \label{sec:heat_diff}
-% list the cases associated with this section
-\label{ht3d_nx_10,ht3d_nx_20,ht3d_nx_40,ht3d_nx_80,ht3d_nx_160}
-\label{ht3d_ny_10,ht3d_ny_20,ht3d_ny_40,ht3d_ny_80,ht3d_ny_160}
-\label{ht3d_nz_10,ht3d_nz_20,ht3d_nz_40,ht3d_nz_80,ht3d_nz_160}
+\label{ht3d_nx_10}
+\label{ht3d_nx_20}
+\label{ht3d_nx_40}
+\label{ht3d_nx_80}
+\label{ht3d_nx_160}
+\label{ht3d_ny_10}
+\label{ht3d_ny_20}
+\label{ht3d_ny_40}
+\label{ht3d_ny_80}
+\label{ht3d_ny_160}
+\label{ht3d_nz_10}
+\label{ht3d_nz_20}
+\label{ht3d_nz_40}
+\label{ht3d_nz_80}
+\label{ht3d_nz_160}
 
 This test case is an initial value problem for the heat equation in 1D.  In FDS, a square bar of length $L=1\;\si{m}$ is initialized with a sine profile that decays exponentially in time.  The temperature baseline is $T_0 = 20 \;\si{\degree C}$.  The Dirichlet boundary conditions at each end of the bar are set to $T_0$.  The initial amplitude of the wave is $A = 100 \;\si{\degree C}$ and the starting position of the bar is $x_0 = -0.5 \;\si{m}$.  The thermal properties of the material are set to give a thermal diffusivity of $\alpha = 1 \;\si{m^2/s}$.  The solution to this problem is given by \cite{Crank:1}
 \begin{equation}
@@ -3565,9 +3576,10 @@ Figure \ref{fig:ht3d_ibeam_contours} shows a comparison between the surface temp
 \clearpage
 
 \subsection{3D Heat Diffusion Across Mesh Boundaries (\texorpdfstring{\textct{ht3d\_2mesh}}{ht3d\_2mesh})}
-\label{ht3d_2mesh}
-%list cases associated with this section
-\label{ht3d_2mesh_x,ht3d_2mesh_y,ht3d_2mesh_z}
+\label{sec:ht3d_2mesh}
+\label{ht3d_2mesh_x}
+\label{ht3d_2mesh_y}
+\label{ht3d_2mesh_z}
 
 This set of cases tests the ability of the 3D heat conduction solver to transfer heat across mesh boundaries.  The set of up is a 1 m long insulated square bar, 0.2 m $\times$ 0.2 m in cross section.  One end is held at \SI{200}{\degreeCelsius} and the other at \SI{20}{\degreeCelsius}.  The mesh boundary lies at the midpoint between the two ends (Position = 0 m).  The thermal diffusivity is unity.  The solution is run for 100 s from an initial condition of \SI{20}{\degreeCelsius} everywhere except the hot surface.  The steady state profile is linear between the two end temperatures.  Results for three different orientations of the bar are shown in Fig.~\ref{fig:ht3d_2mesh} below.
 
@@ -4988,6 +5000,108 @@ h_{\mbox{\tiny CFD}} = c_p V(T_{\mbox{\tiny left}} \rho_{\mbox{\tiny left}}+T_{\
 % Twelve examples in which different triangles intersect with a bounding box are summarized in Table \ref{tab_cutcell_areas}.  NXP represents the vertices of the intersection polygon, whose area is calculated as shown. Examples (1) through (4) and (6) through (8) have a regular triangle intersection. Examples (5) and (9) have a point and line intersection, both with zero area. Examples (10), (11), and (12) are more complicated cases. The intersection polygon has six (6), seven (7), and nine (9) vertices, respectively.
 %
 %\newpage
+
+\clearpage
+
+\chapter{Vegetation}
+
+\section{Introduction}
+
+\section{Tests}
+\subsection{Mass conservation (\texorpdfstring{\textct{vege\_mass\_conservation}}{vege\_mass\_conservation})}
+\label{vege_mass_conservation}}
+The total mass, which is the sum of fuel gas mass, water vapor mass
+and solid mass, should remain constant over time.
+\begin{figure}[ht]
+\centering
+\includegraphics[width=3.2in]{SCRIPT_FIGURES/vege_mass_conservation}
+\caption[\textct{Vegetation\_vege\_mass\_conservation} test
+case.]{Total mass should remain constant over time.}
+\label{fig_vege_mass_conservation}
+\end{figure}
+
+\subsection{Radiation}
+\label{radiation_gas-veg_consistency}
+Vegetation is assumed to participate radiatively as a medium that is
+\begin{itemize}
+ \item Nonscattering
+ \item Optically black (no reflection)
+ \item Opaque (no transmission)
+\end{itemize}
+
+With these assumptions, the thermal radiation transfer equation for a
+gray medium (no wavelength dependence) reduces to
+\be
+ s \cdot \nabla I(x,s) = \kappa_{\mathrm{gas}} \left[ I_{\mathrm{b}} \left(
+   T_{\mathrm{gas} \right) - I(x, s) \right] + \kappa_{\mathrm{veg}}
+ \left[ \epsilon_{\mathrm{veg}} I_{\mathrm{b}}\left( T_{\mathrm{veg}}
+   \right) - I(x, s) \right].
+\label{eq:thermal transfer equation}
+\ee
+Equation~\ref{eq:thermal transfer equation} is used to model
+vegetation composed of one type, e.g., a fuel bed composed only of
+pine needles, by a number of researchers; see Morvan (2000) 
+\cite{Morvan:2000} and Porterie (2006) \cite{Porterie:2006}.
+
+Integrating Equation~\ref{eq:thermal transfer equation} over all solid
+angles gives the equation for conservation of radiant energy.
+\be
+\nabla \cdot q_{\mathrm{r}}(x) = \kappa_{\mathrm{gas}} \left[ 4 \pi
+  I_\mathrm{b}} \left(T_{\mathrm{gas}} \right) - U(s) \right] +
+\kappa_{\mathrm{veg}} \left[ 4 \pi I_{\mathrm{b}}
+  \left(T_{\mathrm{veg}}\right) - U(s) \right].
+\label{eq:conservation of radiant energy}
+\ee	
+Here 
+\begin{itemize}
+ \item $s$ is a unit vector in the direction of the radiation intensity
+ \item $I$ is the radiation intensity, W m$^{-2}$ sr$^{-2}$
+ \item $I_{\mathrm{b}}$= $\sigma_{\mathrm{B}} T^4/\pi$ is the blackbody radiation intensity, W m$^{-2}$ sr$^{-2}$
+ \item $\sigma_{\mathrm{B}} = 5.670367 \times 10^{−8}$  is the
+   Stefan-Boltzmann constant, W m$^{−2}$ K$^{−4}$
+ \item $U$ is the integrated radiation intensity, W m$^{-2}$
+ \item $\kappa_{\mathrm{gas}}$ is the gray gas absorption coefficient
+ \item $\epsilon_{\mathrm{veg}}$ is the emissivity of vegetation, usually
+   assumed equal to 1
+ \item $\kappa_{\mathrm{veg}}$ is the gray absorption coefficient of bulk vegetation
+\end{itemize}
+The structure of Equation~\ref{eq:conservation of radiant energy}
+suggests a pair of reciprocal consistency tests.  The integrated radiant energy
+computed by FDS for the case $\kappa_{\mathrm{gas}} = 1, \kappa_{\mathrm{veg}} = 0$ should equal that computed for
+$\kappa_{\mathrm{gas}} = 0, \kappa_{\mathrm{\mathrm{veg}} = 1$.  
+
+\subsubsection{The radiant energy computed with $\kappa_{\mathrm{gas}}
+  = 1$, $\kappa_{\mathrm{veg}} = 0$ is consistent with
+ the radiant energy pre-computed with $\kappa_{\mathrm{gas}} = 0$,
+$\kappa_{\mathrm{veg}} = 1$ (\texorpdfstring{\textct{radiation\_gas-veg\_consistency\_gas}}{radiation\_gas-veg\_consistency\_gas})}
+\label{radiation_gas-veg_consistency_gas}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=3.2in]{SCRIPT_FIGURES/radiation_gas-veg_consistency_gas}
+\caption[\textct{Vegetation\_radiation\_veg-gas\_consistency\_gas}
+test case.]{Radiant energy computed with $\kappa_{\mathrm{gas}}
+  = 1$, $\kappa_{\mathrm{veg}} = 0$ is plotted along with end-time values
+  for the radiant energy pre-computed with  $\kappa_{\mathrm{gas}} = 0$,
+$\kappa_{\mathrm{veg}} = 1$.}
+\label{fig_radiation_gas-veg_consistency_gas}
+\end{figure}
+
+\subsubsection{The radiant energy computed with $\kappa_{\mathrm{gas}}
+  = 0$, $\kappa_{\mathrm{veg}} = 1$ is consistent with
+ the radiant energy pre-computed with $\kappa_{\mathrm{gas}} = 1$,
+$\kappa_{\mathrm{veg}} = 0$ (\texorpdfstring{\textct{radiation\_gas-veg\_consistency\_veg}}{radiation\_gas-veg\_consistency\_veg})}
+\label{radiation_gas-veg_consistency_veg}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=3.2in]{SCRIPT_FIGURES/radiation_gas-veg_consistency_veg}
+\caption[\textct{Vegetation\_radiation\_veg-gas\_consistency\_veg} test case.]{Radiant energy computed with $\kappa_{\mathrm{gas}}
+  = 0$, $\kappa_{\mathrm{veg}} = 1$ is plotted along with end-time values
+  for the radiant energy pre-computed with  $\kappa_{\mathrm{gas}} = 1$,
+$\kappa_{\mathrm{veg}} = 0$.}
+\label{fig_radiation_gas-veg_consistency_veg}
+\end{figure}
 
 \chapter{Outputs}
 
