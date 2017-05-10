@@ -176,39 +176,39 @@ WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS
          SELECT CASE(IOR)
             CASE( 1)
                IF (UU(0,J,K)<0._EB) THEN
-                  BXS(J,K) = P_EXTERNAL/WC%RHO_F + KRES(1,J,K)
+                  BXS(J,K) = P_EXTERNAL/WC%ONE_D%RHO_F + KRES(1,J,K)
                ELSE
-                  BXS(J,K) = P_EXTERNAL/WC%RHO_F + H0
+                  BXS(J,K) = P_EXTERNAL/WC%ONE_D%RHO_F + H0
                ENDIF
             CASE(-1)
                IF (UU(IBAR,J,K)>0._EB) THEN
-                  BXF(J,K) = P_EXTERNAL/WC%RHO_F + KRES(IBAR,J,K)
+                  BXF(J,K) = P_EXTERNAL/WC%ONE_D%RHO_F + KRES(IBAR,J,K)
                ELSE
-                  BXF(J,K) = P_EXTERNAL/WC%RHO_F + H0
+                  BXF(J,K) = P_EXTERNAL/WC%ONE_D%RHO_F + H0
                ENDIF
             CASE( 2)
                IF (VV(I,0,K)<0._EB) THEN
-                  BYS(I,K) = P_EXTERNAL/WC%RHO_F + KRES(I,1,K)
+                  BYS(I,K) = P_EXTERNAL/WC%ONE_D%RHO_F + KRES(I,1,K)
                ELSE
-                  BYS(I,K) = P_EXTERNAL/WC%RHO_F + H0
+                  BYS(I,K) = P_EXTERNAL/WC%ONE_D%RHO_F + H0
                ENDIF
             CASE(-2)
                IF (VV(I,JBAR,K)>0._EB) THEN
-                  BYF(I,K) = P_EXTERNAL/WC%RHO_F + KRES(I,JBAR,K)
+                  BYF(I,K) = P_EXTERNAL/WC%ONE_D%RHO_F + KRES(I,JBAR,K)
                ELSE
-                  BYF(I,K) = P_EXTERNAL/WC%RHO_F + H0
+                  BYF(I,K) = P_EXTERNAL/WC%ONE_D%RHO_F + H0
                ENDIF
             CASE( 3)
                IF (WW(I,J,0)<0._EB) THEN
-                  BZS(I,J) = P_EXTERNAL/WC%RHO_F + KRES(I,J,1)
+                  BZS(I,J) = P_EXTERNAL/WC%ONE_D%RHO_F + KRES(I,J,1)
                ELSE
-                  BZS(I,J) = P_EXTERNAL/WC%RHO_F + H0
+                  BZS(I,J) = P_EXTERNAL/WC%ONE_D%RHO_F + H0
                ENDIF
             CASE(-3)
                IF (WW(I,J,KBAR)>0._EB) THEN
-                  BZF(I,J) = P_EXTERNAL/WC%RHO_F + KRES(I,J,KBAR)
+                  BZF(I,J) = P_EXTERNAL/WC%ONE_D%RHO_F + KRES(I,J,KBAR)
                ELSE
-                  BZF(I,J) = P_EXTERNAL/WC%RHO_F + H0
+                  BZF(I,J) = P_EXTERNAL/WC%ONE_D%RHO_F + H0
                ENDIF
          END SELECT
 
@@ -717,7 +717,7 @@ CHECK_WALL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
 
    VELOCITY_ERROR = UN_NEW - UN_NEW_OTHER
    WC%VEL_ERR_NEW = VELOCITY_ERROR
-   WALL_WORK1(IW) = -SIGN(1._EB,REAL(IOR,EB))*ITERATIVE_FACTOR*VELOCITY_ERROR/(WC%RDN*DT)
+   WALL_WORK1(IW) = -SIGN(1._EB,REAL(IOR,EB))*ITERATIVE_FACTOR*VELOCITY_ERROR/(WC%ONE_D%RDN*DT)
 
    ! If the grid cells in the current mesh are smaller than those of the other mesh, do not include in error tolerance
 
@@ -1619,7 +1619,7 @@ CASE(GLMAT_WHLDOM)
    !                   IROW = CCVAR(I,J,K,UNKH) - UNKH_IND(NM_START)
    !                ELSEIF (CCVAR(I,J,K,1)==0) THEN
    !                   ICC=CCVAR(I,J,K,4)
-   !                   IROW= IBM_CUT_CELL(ICC)%UNKH(1) - UNKH_IND(NM_START)
+   !                   IROW= CUT_CELL(ICC)%UNKH(1) - UNKH_IND(NM_START)
    !                ENDIF
    !                WRITE(33,'(4I8,5F24.18)') NM,I,J,K,XC(I),YC(J),ZC(K),F_H(IROW),X_H(IROW)
    !             ENDDO
