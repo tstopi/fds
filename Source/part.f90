@@ -1677,7 +1677,7 @@ REAL(EB) :: UBAR,VBAR,WBAR,RVC,UREL,VREL,WREL,QREL,RHO_G,TMP_G,MU_AIR, &
             U_OLD,V_OLD,W_OLD,ZZ_GET(1:N_TRACKED_SPECIES),WAKE_VEL,DROP_VOL_FRAC,RE_WAKE,&
             WE_G,T_BU_BAG,T_BU_STRIP,MPOM,ALBO,SFAC,BREAKUP_RADIUS(0:NDC),&
             DD,DD_X,DD_Y,DD_Z,DW_X,DW_Y,DW_Z,K_TERM(3),Y_TERM(3),C_DRAG,A_DRAG,HAB,PARACOR,QREL2,X_WGT,Y_WGT,Z_WGT,&
-            GX_LOC,GY_LOC,GZ_LOC,DUMMY,DRAG_MAX(3)
+            GX_LOC,GY_LOC,GZ_LOC,DUMMY,DRAG_MAX(3),TAU_P,TAU_T,K_SGS
 REAL(EB), SAVE :: FP_MASS,HALF_DT2,BETA,OBDT,ALPHA,OPA,DTOPA,BDTOA
 INTEGER IIX,JJY,KKZ
 
@@ -1868,6 +1868,25 @@ PARTICLE_NON_STATIC_IF: IF (.NOT.LPC%STATIC) THEN ! Move airborne, non-stationar
       GZ_LOC = EVALUATE_RAMP(LP%X,DUMMY,I_RAMP_GZ)*GVEC(3)
    ENDIF
 
+
+   ! Turbulent dispersion
+   ! Bini, M., and W. P. Jones. "Large-eddy simulation of particle-laden turbulent flows." 
+   !  Journal of Fluid Mechanics 614 (2008): 207-252.
+   IF(LPC%TURBULENT_DISPERSION) THEN
+     DELTA = LES_FILTER_WIDTH_FUNCTION(DX(IIG),DY(JJG),DZ(KKG))
+     K_SGS = (MU(IIG,JJG,KKG)/(RHO(IIG,JJG,KKG)*C_DEARDORFF*DELTA))**2
+     TAU_P = 2._EB*LP%MASS/(RHO_G*A_DRAG*QREL*C_DRAG)
+     TAU_T = TAU_P**1.6/(DELTA/SQRT(K_SGS))**0.6
+     !TAU_T = DELTA**ONTH/SQRT(K_SGS)
+     DD    = SQRT(K_SGS/TAU_T*DT)
+     ! generate pairs of standard Gaussian random variables
+     CALL BOX_MULLER(DW_X,DW_Y)
+     CALL BOX_MULLER(DW_Z,DW_X)
+     !WRITE(LU_ERR,*) K_SGS,TAU_P,TAU_T
+     LP%U = LP%U + DD*DW_X
+     LP%V = LP%V + DD*DW_Y
+     LP%W = LP%W + DD*DW_Z
+   ENDIF
    IF (BETA>TWO_EPSILON_EB) THEN
       ! fluid momentum source term
       MPOM = LP%PWT*RVC/RHO_G
