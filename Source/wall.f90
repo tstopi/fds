@@ -1971,37 +1971,23 @@ PYROLYSIS_PREDICTED_IF: IF (SF%PYROLYSIS_MODEL==PYROLYSIS_PREDICTED) THEN
                   REGRID_SUM = 1._EB
                   CYCLE MATERIAL_LOOP1a
                ENDIF
-<<<<<<< HEAD
                   SMIX_PTR = MAXLOC(ML%NU_GAS(:,1),1)
-                  ZZ_GET(1:N_TRACKED_SPECIES) = MAX(0._EB,ZZ(IIG,JJG,KKG,1:N_TRACKED_SPECIES))
+                  ZZ_GET(1:N_TRACKED_SPECIES) = MAX(0._EB,ZZ(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG,1:N_TRACKED_SPECIES))
                   CALL GET_MOLECULAR_WEIGHT(ZZ_GET,MW_G)
                   X_G = ZZ_GET(SMIX_PTR)/SPECIES_MIXTURE(SMIX_PTR)%MW*MW_G
                   X_W = MIN(1._EB-TWO_EPSILON_EB,EXP(ML%H_R(1)*SPECIES_MIXTURE(SMIX_PTR)%MW/R0*(1._EB/ML%TMP_BOIL-1._EB/ONE_D%TMP_F)))
                   IF (DNS) THEN
-                     CALL INTERPOLATE1D_UNIFORM(LBOUND(D_Z(:,SMIX_PTR),1),D_Z(:,SMIX_PTR),TMP(IIG,JJG,KKG),D_AIR)
+                     CALL INTERPOLATE1D_UNIFORM(LBOUND(D_Z(:,SMIX_PTR),1),D_Z(:,SMIX_PTR),ONE_D%TMP_G,D_AIR)
                      H_MASS = 2._EB*D_AIR*RDN
                   ELSE
-                     TMP_FILM = 0.5_EB*(TMP_G + ONE_D%TMP_F)
+                     TMP_FILM = 0.5_EB*(ONE_D%TMP_G + ONE_D%TMP_F)
                      CALL GET_MOLECULAR_WEIGHT(ZZ_GET,MW_AIR)
                      CALL GET_VISCOSITY(ZZ_GET,MU_AIR,TMP_FILM)
                      CALL INTERPOLATE1D_UNIFORM(LBOUND(D_Z(:,SMIX_PTR),1),D_Z(:,SMIX_PTR),TMP_FILM,D_AIR)
                      ! Calculate tangential velocity near the surface
-                     RHO_G = RHOG(IIG,JJG,KKG)
-                     RHO_AIR = (MW_AIR*PBARP(KKG,PRESSURE_ZONE(IIG,JJG,KKG))/(TMP_FILM*R0))
+                     RHO_AIR = (MW_AIR*PBARP(ONE_D%KKG,PRESSURE_ZONE(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG))/(TMP_FILM*R0))
                      SC_AIR = MU_AIR/D_AIR/RHO_AIR    ! NU_AIR/D_AIR (Incropera & DeWitt, Chap 7, External Flow)
-                     U2 = 0.25_EB*(UU(IIG,JJG,KKG)+UU(IIG-1,JJG,KKG))**2
-                     V2 = 0.25_EB*(VV(IIG,JJG,KKG)+VV(IIG,JJG-1,KKG))**2
-                     W2 = 0.25_EB*(WW(IIG,JJG,KKG)+WW(IIG,JJG,KKG-1))**2
-                     SELECT CASE(ABS(IOR))
-                     CASE(1)
-                        U2 = 0._EB
-                     CASE(2)
-                        V2 = 0._EB
-                     CASE(3)
-                        W2 = 0._EB
-                     END SELECT
-                     VELCON = SQRT(U2+V2+W2)
-                     RE_L     = RHO_AIR*VELCON*SF%CONV_LENGTH/MU_AIR
+                     RE_L     = RHO_AIR*ONE_D%U_TANG*SF%CONV_LENGTH/MU_AIR
                      IF(RE_L<5.E5_EB) THEN
                         SHERWOOD = 0.664*RE_L**0.5_EB*SC_AIR**ONTH;
                      ELSE
@@ -2014,47 +2000,8 @@ PYROLYSIS_PREDICTED_IF: IF (SF%PYROLYSIS_MODEL==PYROLYSIS_PREDICTED) THEN
                      H_MASS=SF%HM_FIXED
                   ENDIF
                   MFLUX = MAX(0._EB,SPECIES_MIXTURE(SMIX_PTR)%MW/R0/ONE_D%TMP_F*H_MASS*LOG((X_G-1._EB)/(X_W-1._EB)))
-                  MFLUX = MFLUX * PBARP(KKG,PRESSURE_ZONE(IIG,JJG,KKG))
+                  MFLUX = MFLUX * PBARP(ONE_D%KKG,PRESSURE_ZONE(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG))
                   MFLUX = MIN(MFLUX,ONE_D%LAYER_THICKNESS(LAYER_INDEX(1))*ML%RHO_S/DT_BC)
-=======
-               SMIX_PTR = MAXLOC(ML%NU_GAS(:,1),1)
-               ZZ_GET(1:N_TRACKED_SPECIES) = MAX(0._EB,ONE_D%ZZ_G(1:N_TRACKED_SPECIES))
-               CALL GET_MOLECULAR_WEIGHT(ZZ_GET,MW_G)
-               X_G = ZZ_GET(SMIX_PTR)/SPECIES_MIXTURE(SMIX_PTR)%MW*MW_G
-               X_W = MIN(1._EB-TWO_EPSILON_EB,EXP(ML%H_R(1)*SPECIES_MIXTURE(SMIX_PTR)%MW/R0*(1._EB/ML%TMP_BOIL-1._EB/ONE_D%TMP_F)))
-               IF (DNS) THEN
-                  CALL INTERPOLATE1D_UNIFORM(LBOUND(D_Z(:,SMIX_PTR),1),D_Z(:,SMIX_PTR),ONE_D%TMP_G,D_AIR)
-                  H_MASS = 2._EB*D_AIR*(RDX(ONE_D%IIG)*RDY(ONE_D%JJG)*RDZ(ONE_D%KKG))**ONTH
-               ELSE
-                  CALL GET_VISCOSITY(ZZ_GET,MU_AIR,ONE_D%TMP_G)
-                  RE_L     = MAX(5.E5_EB,ONE_D%RHO_G*ONE_D%U_TANG*SF%CONV_LENGTH/MU_AIR)
-                  SHERWOOD = SH_FAC_WALL*RE_L**0.8_EB
-                  H_MASS = SHERWOOD*MU_AIR/(ONE_D%RHO_G*SC*SF%CONV_LENGTH)
-               ENDIF
-               IF(SF%HM_FIXED>=0._EB) THEN
-                  H_MASS=SF%HM_FIXED
-               ENDIF
-               MFLUX = MAX(0._EB,SPECIES_MIXTURE(SMIX_PTR)%MW/R0/ONE_D%TMP_F*H_MASS*LOG((X_G-1._EB)/(X_W-1._EB)))
-               MFLUX = MFLUX * PBARP(ONE_D%KKG,PRESSURE_ZONE(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG))
-               MFLUX = MIN(MFLUX,ONE_D%LAYER_THICKNESS(LAYER_INDEX(1))*ML%RHO_S/DT_BC)
-
-               ! CYLINDRICAL and SPHERICAL scaling not implemented
-               DO NS = 1,N_TRACKED_SPECIES
-                  ONE_D%MASSFLUX(NS)        = ONE_D%MASSFLUX(NS)        + ML%ADJUST_BURN_RATE(NS,1)*ML%NU_GAS(NS,1)*MFLUX
-                  ONE_D%MASSFLUX_ACTUAL(NS) = ONE_D%MASSFLUX_ACTUAL(NS) +                           ML%NU_GAS(NS,1)*MFLUX
-               ENDDO
-               J = 0
-               ! Always remesh for liquid fuels
-               IF(MFLUX>TWO_EPSILON_EB) REMESH=.TRUE.
-               DO WHILE (MFLUX > 0._EB)
-                  J = J + 1
-                  MFLUX_S = MIN(MFLUX,DX_S(J)*ML%RHO_S/DT_BC)
-                  Q_S(1) = Q_S(1) - MFLUX_S*ML%H_R(1)/DX_S(J)
-                  ONE_D%RHO(J,N) = MAX( 0._EB , ONE_D%RHO(J,N) - DT_BC*MFLUX_S/DX_S(J) )
-                  MFLUX = MFLUX-MFLUX_S
-               ENDDO
->>>>>>> firemodels/master
-
                   ! CYLINDRICAL and SPHERICAL scaling not implemented
                   DO NS = 1,N_TRACKED_SPECIES
                      ONE_D%MASSFLUX(NS)        = ONE_D%MASSFLUX(NS)        + ML%ADJUST_BURN_RATE(NS,1)*ML%NU_GAS(NS,1)*MFLUX
