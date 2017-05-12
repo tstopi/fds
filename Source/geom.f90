@@ -386,7 +386,7 @@ PUBLIC :: ADD_INPLACE_NNZ_H_BYMESH,ADD_INPLACE_NNZ_H_WHLDOM,&
           CCREGION_DIVERGENCE_PART_1,CCIBM_CHECK_DIVERGENCE,CCIBM_END_STEP,CCIBM_H_INTERP,CCIBM_RHO0W_INTERP, &
           CCIBM_SET_DATA,CCIBM_VELOCITY_CUTFACES,CCIBM_VELOCITY_FLUX, &
           CCIBM_VELOCITY_NO_GRADH,CCREGION_DENSITY,CFACE_THERMAL_GASVARS,CHECK_SPEC_TRANSPORT_CONSERVE,FINISH_CCIBM, &
-          SET_CUTCELLS_3D,TRILINEAR,GET_CC_MATRIXGRAPH_H,GET_CUTCELL_FH,GET_CUTCELL_HP, &
+          TRILINEAR,GET_CC_MATRIXGRAPH_H,GET_CUTCELL_FH,GET_CUTCELL_HP, &
           GETU,GET_GASCUTFACE_SCALAR_SLICE,GETGRAD,GET_BOUNDFACE_GEOM_INFO_H, &
           GET_H_CUTFACES,GET_H_MATRIX_CC,GET_CRTCFCC_INTERPOLATION_STENCILS,GET_RCFACES_H,GET_INBCUTFACE_SCALAR_SLICE, &
           GET_EXIMFACE_SCALAR_SLICE,GET_SOLIDCUTFACE_SCALAR_SLICE,GET_SOLIDREGFACE_SCALAR_SLICE, &
@@ -440,6 +440,10 @@ CASE(IBM_FTYPE_CFGAS) ! Cut-cell -> use value from CUT_CELL data struct:
    ICC = CUT_FACE(IND1)%CELL_LIST(2,LOW_IND,IND2)
    JCC = CUT_FACE(IND1)%CELL_LIST(3,LOW_IND,IND2)
 
+   I = CUT_CELL(ICC)%IJK(IAXIS)
+   J = CUT_CELL(ICC)%IJK(JAXIS)
+   K = CUT_CELL(ICC)%IJK(KAXIS)
+
    ! ADD CUT_CELL properties:
    ONE_D%TMP_G = CUT_CELL(ICC)%TMP(JCC)
    ONE_D%RSUM_G= CUT_CELL(ICC)%RSUM(JCC)
@@ -449,14 +453,13 @@ CASE(IBM_FTYPE_CFGAS) ! Cut-cell -> use value from CUT_CELL data struct:
    ONE_D%ZZ_G(1:N_TRACKED_SPECIES) = PREDFCT *CUT_CELL(ICC)%ZZS(1:N_TRACKED_SPECIES,JCC) + &
                               (1._EB-PREDFCT)*CUT_CELL(ICC)% ZZ(1:N_TRACKED_SPECIES,JCC)
 
+   ! Viscosity, Use MU from bearing cartesian cell:
+   ONE_D%MU_G = MU(I,J,K)
+   
    ! Finally U_TANG velocity: For now compute the Area average component on each direction:
    ! This can be optimized by moving the computaiton of U_CAVG out, before call to WALL_BC.
    U_CAVG(IAXIS:KAXIS)   = 0._EB
    AREA_TANG(IAXIS:KAXIS)= 0._EB
-
-   I = CUT_CELL(ICC)%IJK(IAXIS)
-   J = CUT_CELL(ICC)%IJK(JAXIS)
-   K = CUT_CELL(ICC)%IJK(KAXIS)
 
    NFCELL=CUT_CELL(ICC)%CCELEM(1,JCC)
    DO ICCF=1,NFCELL
@@ -1734,6 +1737,7 @@ CALL SET_CUTCELLS_3D                    ! Defines CUT_CELL data for each mesh.
 IF (COMPUTE_CUTCELLS_ONLY) RETURN
 
 CALL GET_CRTCFCC_INTERPOLATION_STENCILS ! Computes interpolation stencils for face and cell centers.
+CALL SET_CFACES_ONE_D_RDN               ! Set inverse DXN for CFACES.
 CALL SET_CCIBM_MATVEC_DATA              ! Defines data for discretization matrix-vectors.
 
 ! Here in case of Moving meshes -> do interpolation of variables to newly defined cut-cells and faces.
@@ -1743,6 +1747,74 @@ CALL SET_CCIBM_MATVEC_DATA              ! Defines data for discretization matrix
 CC_MATVEC_DEFINED=.TRUE.
 
 RETURN
+
+CONTAINS
+
+! ------------------------ SET_CFACES_ONE_D_RDN ---------------------------------
+
+SUBROUTINE SET_CFACES_ONE_D_RDN
+
+! Local Variables:
+INTEGER :: ICF, IFACE, CFACE_INDEX_LOCAL
+INTEGER :: ICC, JCC, IBOD, IWSEL, I, J, K
+REAL(EB):: DXCF(IAXIS:KAXIS), NVEC(IAXIS:KAXIS), DCFXN, DCFXN2
+
+! Main Loop:
+MESH_LOOP_1 : DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
+
+   CALL POINT_TO_MESH(NM)
+
+   ! Define ONE_D%RDN:
+   DO ICF=1,MESHES(NM)%N_CUTFACE_MESH
+      IF(CUT_FACE(ICF)%STATUS /= IBM_INBOUNDARY) CYCLE
+      DO IFACE=1,CUT_FACE(ICF)%NFACE
+         ! Option, we'll see if it is required: Cycle Areas less than GEOMEPS^2, insignificantly small.
+         ! IF(CUT_FACE(ICF)%AREA(IFACE) < GEOMEPS*GEOMEPS) CYCLE
+         ! Index in CFACE for cut-face in (ICF,IFACE) of CUT_FACE.
+         CFACE_INDEX_LOCAL = CUT_FACE(ICF)%CFACE_INDEX(IFACE)
+
+         ! Compute CFACE(:)%ONE_D%RDN:
+         SELECT CASE(CUT_FACE(ICF)%CELL_LIST(1,LOW_IND,IFACE))
+         CASE(IBM_FTYPE_CFGAS) ! Cut-cell -> use xcen value from CUT_CELL data struct:
+            ICC = CUT_FACE(ICF)%CELL_LIST(2,LOW_IND,IFACE)
+            JCC = CUT_FACE(ICF)%CELL_LIST(3,LOW_IND,IFACE)
+
+            ! Xcc - Xcf:
+            DXCF(IAXIS:KAXIS) = CUT_CELL(ICC)%XYZCEN(IAXIS:KAXIS,JCC) - CUT_FACE(ICF)%XYZCEN(IAXIS:KAXIS,IFACE)
+
+            ! Normal to cut-face:
+            IBOD =CUT_FACE(ICF)%BODTRI(1,IFACE)
+            IWSEL=CUT_FACE(ICF)%BODTRI(2,IFACE)
+            NVEC(IAXIS:KAXIS) = GEOMETRY(IBOD)%FACES_NORMAL(IAXIS:KAXIS,IWSEL)
+
+            ! Dot product gives normal distance from Xcf to Xcc:
+            DCFXN = ABS(DXCF(IAXIS)*NVEC(IAXIS) + DXCF(JAXIS)*NVEC(JAXIS) + DXCF(KAXIS)*NVEC(KAXIS))
+
+            IF (DCFXN < GEOMEPS) THEN ! Use the norm of Xcc - Xcf
+               DCFXN = SQRT(DXCF(IAXIS)**2._EB + DXCF(JAXIS)**2._EB + DXCF(KAXIS)**2._EB)
+               IF (DCFXN < GEOMEPS) THEN
+                  I = CUT_CELL(ICC)%IJK(IAXIS)
+                  J = CUT_CELL(ICC)%IJK(JAXIS)
+                  K = CUT_CELL(ICC)%IJK(KAXIS)
+                  DCFXN2 = 0.5_EB*ABS(NVEC(IAXIS)*DX(I)+NVEC(JAXIS)*DY(J)+NVEC(KAXIS)*DZ(K))
+                  WRITE(LU_ERR,*) 'Dist from CC to INB cut-face < GEOMEPS=',ICF,IFACE,DCFXN,'Will use 1/2*dot(DX,n)=',DCFXN2
+                  DCFXN = DCFXN2
+               ENDIF
+            ENDIF
+
+            ! Now cut-cell centroid to "ghost cut-cell" centroid assumed to be twice the previous:
+            DCFXN2 = 2._EB*(DCFXN)
+            MESHES(NM)%CFACE(CFACE_INDEX_LOCAL)%ONE_D%RDN = 1._EB/DCFXN2
+         END SELECT
+
+      ENDDO
+   ENDDO
+
+ENDDO MESH_LOOP_1
+
+RETURN
+END SUBROUTINE SET_CFACES_ONE_D_RDN
+
 END SUBROUTINE CCIBM_SET_DATA
 
 ! ------------------------------- CCIBM_END_STEP --------------------------------
@@ -1827,6 +1899,8 @@ USE PHYSICAL_FUNCTIONS, ONLY: GET_SPECIFIC_GAS_CONSTANT
 INTEGER :: NM,I,J,K,N,ICC,JCC,X1AXIS,NFACE,ICF,IFACE
 REAL(EB) TMP_CC,RHO_CC,AREAT,VEL_CF,RHOPV(-1:0)
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: ZZ_CC
+TYPE(CFACE_TYPE), POINTER :: CFA=>NULL()
+INTEGER :: IND1, IND2
 
 ALLOCATE( ZZ_CC(1:N_TOTAL_SCALARS) )
 
@@ -1989,6 +2063,23 @@ MESH_LOOP : DO NM=1,NMESHES
       ENDDO
    ENDDO
 
+   ! CFACES:
+   DO ICF=1,N_CFACE_CELLS
+      CFA  => CFACE(ICF)
+      IND1 = CFA%CUT_FACE_IND1
+      IND2 = CFA%CUT_FACE_IND2
+      ICC = CUT_FACE(IND1)%CELL_LIST(2,LOW_IND,IND2)
+      JCC = CUT_FACE(IND1)%CELL_LIST(3,LOW_IND,IND2)
+
+      ! Here are some hacky initializations:
+      ! Set TMP_F to ambient in under laying cartesian cell.
+      CFA%ONE_D%TMP_F = TMP_0(CUT_FACE(IND1)%IJK(KAXIS))
+      CFA%ONE_D%RHO_F = CUT_CELL(ICC)%RHO(JCC)
+      CFA%ONE_D%ZZ_F(1:N_TOTAL_SCALARS)  = CUT_CELL(ICC)%ZZ(1:N_TOTAL_SCALARS,JCC)
+
+   ENDDO
+
+
 ENDDO MESH_LOOP
 
 DEALLOCATE( ZZ_CC )
@@ -2127,7 +2218,8 @@ INTEGER :: INDZ
 
 ! Pressure sums re-integration vars:
 TYPE(WALL_TYPE), POINTER :: WC=>NULL()
-INTEGER :: IW,IPZ
+TYPE(CFACE_TYPE), POINTER :: CFA=>NULL()
+INTEGER :: IW,IPZ, IND1,IND2
 REAL(EB) :: VC, VC1
 
 ! Dummy on T:
@@ -3239,6 +3331,23 @@ CONDUCTION_HEAT_IF : IF( DO_CONDUCTION_HEAT_FLUX ) THEN
       ENDDO ! IFACE
 
    ENDDO ! ICF
+
+   ! INBOUNDARY cut-faces, loop on CFACE to add BC defined at SOLID phase:
+   DO ICF=1,N_CFACE_CELLS
+      CFA  => CFACE(ICF)
+      IND1 = CFA%CUT_FACE_IND1
+      IND2 = CFA%CUT_FACE_IND2
+      ICC = CUT_FACE(IND1)%CELL_LIST(2,LOW_IND,IND2)
+      !IF (ICC > MESHES(NM)%N_CUTCELL_MESH) CYCLE ! Cut-cell is guard-cell cc.
+      JCC = CUT_FACE(IND1)%CELL_LIST(3,LOW_IND,IND2)
+      IF (PREDICTOR) THEN
+         CUT_CELL(ICC)%DS(JCC) = &
+         CUT_CELL(ICC)%DS(JCC) - ( CFA%ONE_D%QCONF*CFA%ONE_D%RDN ) * CUT_FACE(IND1)%AREA(IND2) ! QCONF(+) into solid.
+      ELSE
+         CUT_CELL(ICC)%D(JCC) = &
+         CUT_CELL(ICC)%D(JCC)  - ( CFA%ONE_D%QCONF*CFA%ONE_D%RDN ) * CUT_FACE(IND1)%AREA(IND2) ! QCONF(+) into solid.
+      ENDIF
+   ENDDO
 
    ! EXIM faces:
    CCM1=0.5_EB; CCP1=0.5_EB
@@ -21344,8 +21453,7 @@ MESH_LOOP_1 : DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
    MESHES(NM)%N_CFACE_CELLS = CFACE_INDEX_LOCAL
 
 ENDDO MESH_LOOP_1
-!WRITE(LU_ERR,*) 'IN PAUSE'
-!PAUSE
+
 RETURN
 END SUBROUTINE GET_INBCUTFACES_TO_CFACE
 
