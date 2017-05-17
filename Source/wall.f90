@@ -74,8 +74,9 @@ END SUBROUTINE WALL_BC
 
 SUBROUTINE THERMAL_BC(T,NM)
 
-! Thermal boundary conditions for adiabatic, fixed temperature, fixed flux and interpolated boundaries.
-! One dimensional heat transfer and pyrolysis is done in PYROLYSIS, which is called at the end of this routine.
+! Thermal boundary conditions for all boundaries.
+! One dimensional heat transfer and pyrolysis is done in PYROLYSIS.
+! Note also that gas phase values are assigned here to be used for all subsequent BCs.
 
 USE MATH_FUNCTIONS, ONLY: EVALUATE_RAMP
 USE PHYSICAL_FUNCTIONS, ONLY : GET_SPECIFIC_GAS_CONSTANT,GET_SPECIFIC_HEAT,GET_VISCOSITY
@@ -157,7 +158,7 @@ IF (SOLID_PARTICLES) THEN
    DO IP = 1, NLP
       LP => LAGRANGIAN_PARTICLE(IP)
       LPC => LAGRANGIAN_PARTICLE_CLASS(LP%CLASS_INDEX)
-      IF (LPC%SOLID_PARTICLE) THEN
+      IF (LPC%SOLID_PARTICLE .OR. LPC%MASSLESS_TARGET) THEN  ! Target particles are included to get gas phase values
          SURF_INDEX = LPC%SURF_INDEX
          ONE_D => LP%ONE_D
          ONE_D%TMP_G   =  TMP(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG)
@@ -168,7 +169,7 @@ IF (SOLID_PARTICLES) THEN
          ONE_D%U_TANG  = 0.25_EB*SQRT ( (UU(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG)+UU(ONE_D%IIG-1,ONE_D%JJG,ONE_D%KKG))**2 + &
                                         (VV(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG)+VV(ONE_D%IIG,ONE_D%JJG-1,ONE_D%KKG))**2 + &
                                         (WW(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG)+WW(ONE_D%IIG,ONE_D%JJG,ONE_D%KKG-1))**2 )
-         CALL CALCULATE_TMP_F(PARTICLE_INDEX=IP)
+         IF (LPC%SOLID_PARTICLE) CALL CALCULATE_TMP_F(PARTICLE_INDEX=IP)
          IF (SURFACE(SURF_INDEX)%THERMALLY_THICK .AND. CALL_PYROLYSIS) CALL PYROLYSIS(NM,T,DT_BC,PARTICLE_INDEX=IP)
       ENDIF
    ENDDO
@@ -882,7 +883,7 @@ SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT_BC_HT3D)>TWO_EPSILON_EB )
 
             TMP_NEW(I,J,K) = TMP(I,J,K) + DT_SUB/(RHO_S*C_S) * ( (KDTDX(I,J,K)-KDTDX(I-1,J,K))*RDX(I) + &
                                                                  (KDTDY(I,J,K)-KDTDY(I,J-1,K))*RDY(J) + &
-                                                                 (KDTDZ(I,J,K)-KDTDZ(I,J,K-1))*RDZ(K) )
+                                                                 (KDTDZ(I,J,K)-KDTDZ(I,J,K-1))*RDZ(K) + Q(I,J,K) )
 
             IF (PYROLYSIS_HT3D) TMP_NEW(I,J,K) = TMP_NEW(I,J,K) + DT_SUB/(RHO_S*C_S) * Q_DOT_PPP_S(I,J,K)
 
