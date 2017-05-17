@@ -1869,24 +1869,7 @@ PARTICLE_NON_STATIC_IF: IF (.NOT.LPC%STATIC) THEN ! Move airborne, non-stationar
    ENDIF
 
 
-   ! Turbulent dispersion
-   ! Bini, M., and W. P. Jones. "Large-eddy simulation of particle-laden turbulent flows." 
-   !  Journal of Fluid Mechanics 614 (2008): 207-252.
-   IF(LPC%TURBULENT_DISPERSION) THEN
-     DELTA = LES_FILTER_WIDTH_FUNCTION(DX(IIG),DY(JJG),DZ(KKG))
-     K_SGS = (MU(IIG,JJG,KKG)/(RHO(IIG,JJG,KKG)*C_DEARDORFF*DELTA))**2
-     TAU_P = 2._EB*LP%MASS/(RHO_G*A_DRAG*QREL*C_DRAG)
-     TAU_T = TAU_P**1.6/(DELTA/SQRT(K_SGS))**0.6
-     !TAU_T = DELTA**ONTH/SQRT(K_SGS)
-     DD    = SQRT(K_SGS/TAU_T*DT)
-     ! generate pairs of standard Gaussian random variables
-     CALL BOX_MULLER(DW_X,DW_Y)
-     CALL BOX_MULLER(DW_Z,DW_X)
-     !WRITE(LU_ERR,*) K_SGS,TAU_P,TAU_T
-     LP%U = LP%U + DD*DW_X
-     LP%V = LP%V + DD*DW_Y
-     LP%W = LP%W + DD*DW_Z
-   ENDIF
+
    IF (BETA>TWO_EPSILON_EB) THEN
       ! fluid momentum source term
       MPOM = LP%PWT*RVC/RHO_G
@@ -1909,6 +1892,24 @@ PARTICLE_NON_STATIC_IF: IF (.NOT.LPC%STATIC) THEN ! Move airborne, non-stationar
       LP%Z = Z_OLD + DT_P*W_OLD + GZ_LOC*HALF_DT2
    ENDIF
 
+   ! Turbulent dispersion
+   ! Bini, M., and W. P. Jones. "Large-eddy simulation of particle-laden turbulent flows." 
+   !  Journal of Fluid Mechanics 614 (2008): 207-252.
+   IF(LPC%TURBULENT_DISPERSION) THEN
+     DELTA = LES_FILTER_WIDTH_FUNCTION(DX(IIG),DY(JJG),DZ(KKG))
+     K_SGS = (MU(IIG,JJG,KKG)/(RHO(IIG,JJG,KKG)*C_DEARDORFF*DELTA))**2
+     TAU_P = 2._EB*LP%MASS/(RHO_G*A_DRAG*QREL*C_DRAG)
+     TAU_T = TAU_P**1.6/(DELTA/SQRT(K_SGS))**0.6
+     !TAU_T = DELTA**ONTH/SQRT(K_SGS)
+     DD    = SQRT(K_SGS/TAU_T*DT_P)
+     ! generate pairs of standard Gaussian random variables
+     CALL BOX_MULLER(DW_X,DW_Y)
+     CALL BOX_MULLER(DW_Z,DW_X)
+     ! WRITE(LU_ERR,*) K_SGS,TAU_P,TAU_T
+     LP%U = LP%U + DD*DW_X
+     LP%V = LP%V + DD*DW_Y
+     LP%W = LP%W + DD*DW_Z
+   ENDIF
    ! gravitational acceleration terms
 
    LP%U = LP%U + GX_LOC*DT_P
