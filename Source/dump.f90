@@ -6419,7 +6419,7 @@ IND_SELECT: SELECT CASE(IND)
              PY%QUANTITY == 'PARTICLE FLUX Y'     .OR. &
              PY%QUANTITY == 'PARTICLE FLUX Z' ) THEN
              IF (PY%PDPA_NORMALIZE) THEN
-                DV%PDPA_DENUM = DV%PDPA_DENUM + FOTHPI*(2._EB*PY%PDPA_RADIUS)**3
+                DV%PDPA_DENUM = DV%PDPA_DENUM + FOTHPI*PY%PDPA_RADIUS**3
              ELSE
                 DV%PDPA_DENUM = 8._EB
              ENDIF
@@ -6439,13 +6439,13 @@ IND_SELECT: SELECT CASE(IND)
                CASE('VELOCITY')
                   VEL = SQRT(LP%U**2 + LP%V**2 + LP%W**2)
                CASE('PARTICLE FLUX X')
-                  VEL = LPC%FTPR*LP%U
+                  VEL = LPC%FTPR*LP%U/8._EB ! (1/2 d)^3 = 1/8 d^3. PDPA_NUMER is calculated from diameter
                CASE('PARTICLE FLUX Y')
-                  VEL = LPC%FTPR*LP%V
+                  VEL = LPC%FTPR*LP%V/8._EB
                CASE('PARTICLE FLUX Z')
-                  VEL = LPC%FTPR*LP%W
+                  VEL = LPC%FTPR*LP%W/8._EB
                CASE('MASS CONCENTRATION')
-                  VEL = LPC%FTPR
+                  VEL = LPC%FTPR/8._EB
                CASE('TEMPERATURE')
                   VEL = LP%ONE_D%TMP_F - TMPM
                CASE('ENTHALPY')
@@ -6455,7 +6455,7 @@ IND_SELECT: SELECT CASE(IND)
                   !CALL INTERPOLATE1D_UNIFORM(LBOUND(SPECIES(LPC%Y_INDEX)%C_P_L_BAR,1),&
                   !                           SPECIES(LPC%Y_INDEX)%C_P_L_BAR,SPECIES(LPC%Y_INDEX)%TMP_MELT,CPBAR)
                   !VEL = VEL - CPBAR*SPECIES(LPC%Y_INDEX)%TMP_MELT
-                  VEL = 0.001_EB*LPC%FTPR*VEL
+                  VEL = 0.001_EB*LPC%FTPR*VEL/8._EB
                CASE DEFAULT
                   VEL = 1.0_EB
             END SELECT
