@@ -1167,7 +1167,7 @@ USE TRAN, ONLY : GET_IJK
 USE MPI
 REAL(EB) :: T, RAP, AX, AXU, AXD, AY, AYU, AYD, AZ, VC, RU, RD, RP, &
             ILXU, ILYU, ILZU, QVAL, BBF, BBFA, NCSDROP, RSA_RAT,EFLUX,TYY_FAC, &
-            AIU_SUM,A_SUM,VOL,VC1,AY1,AZ1,COSINE
+            AIU_SUM,A_SUM,VOL,VC1,AY1,AZ1,COSINE,FP
 INTEGER  :: N,IIG,JJG,KKG,I,J,K,IW,ICF,II,JJ,KK,IOR,IC,IWUP,IWDOWN, &
             ISTART, IEND, ISTEP, JSTART, JEND, JSTEP, &
             KSTART, KEND, KSTEP, NSTART, NEND, NSTEP, &
@@ -1178,7 +1178,7 @@ REAL(EB) :: XID,YJD,ZKD,AREA_VOLUME_RATIO,DLF,DLA(3)
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: ZZ_GET
 INTEGER :: IID,JJD,KKD,IP
 LOGICAL :: UPDATE_INTENSITY, UPDATE_QRW2
-REAL(EB), POINTER, DIMENSION(:,:,:) :: IL,UIIOLD,KAPPA_PART,KFST4_GAS,KFST4_PART,EXTCOE,SCAEFF,IL_UP
+REAL(EB), POINTER, DIMENSION(:,:,:) :: IL,UIIOLD,KAPPA_PART,KFST4_GAS,KFST4_PART,EXTCOE,SCAEFF,IL_UP,FA
 REAL(EB), POINTER, DIMENSION(:)     :: OUTRAD_W,INRAD_W,OUTRAD_F,INRAD_F
 INTEGER, INTENT(IN) :: NM,RAD_ITER
 TYPE (OMESH_TYPE), POINTER :: M2=>NULL()
@@ -1196,6 +1196,7 @@ KAPPA_PART => WORK5
 SCAEFF   => WORK6
 KFST4_PART   => WORK7
 IL_UP    => WORK8
+FA       => WORK9
 OUTRAD_W => WALL_WORK1
 INRAD_W  => WALL_WORK2
 OUTRAD_F => FACE_WORK1
@@ -1292,7 +1293,40 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
 
    ! Compute the absorption coefficient, KAPPA_PART, for a collection of solid particles
 
-   IF (NLP>0 .AND. SOLID_PARTICLES) THEN
+   IF(NEW_PART_KAPPA) THEN
+      IF (NLP>0 .AND. SOLID_PARTICLES) THEN
+         FA = 1._EB
+         DO IP = 1,NLP
+            LP => LAGRANGIAN_PARTICLE(IP)
+            LPC => LAGRANGIAN_PARTICLE_CLASS(LP%CLASS_INDEX)
+            IF (.NOT.LPC%SOLID_PARTICLE) CYCLE
+            CALL GET_IJK(LP%X,LP%Y,LP%Z,NM,XID,YJD,ZKD,IID,JJD,KKD)
+            SELECT CASE(SURFACE(LPC%SURF_INDEX)%GEOMETRY)
+               CASE(SURF_SPHERICAL)
+                  FP = 0.25_EB*LP%ONE_D%AREA*RRN(IID)*RDY(JJD)*RDZ(KKD)*LP%PWT
+               CASE(SURF_CYLINDRICAL)
+                  FP = LP%ONE_D%AREA*RPI*RRN(IID)*RDY(JJD)*RDZ(KKD)*LP%PWT
+               CASE(SURF_CARTESIAN)
+                  FP = 0.5*LP%ONE_D%AREA*RRN(IID)*RDY(JJD)*RDZ(KKD)*LP%PWT
+            END SELECT
+            FA(IID, JJD, KKD) = FA(IID, JJD, KKD) - FP
+            KFST4_PART(IID,JJD,KKD) = KFST4_PART(IID,JJD,KKD) + LP%PWT*SIGMA*LP%ONE_D%AREA*LP%ONE_D%TMP_F**4*RDX(IID)*RRN(IID)*RDY(JJD)*RDZ(KKD)         
+         ENDDO
+         DO K = 1, KBAR
+            DO J = 1, JBAR
+               DO I = 1, IBAR ! innest is fastest
+                  IF (FA(I, J, K) .LT. 1._EB) THEN
+                     IF (FA (I, J, K).LT. 0._EB) THEN
+                        FA(I, J, K) = 0._EB
+                     ENDIF
+                     KAPPA_PART(I, J, K) = KAPPA_PART(I, J, K) - LOG(FA(I, J, K)+TWO_EPSILON_EB)*RDX(I)
+                  ENDIF
+               ENDDO
+            ENDDO
+         ENDDO
+      ENDIF
+   ELSE
+      IF (NLP>0 .AND. SOLID_PARTICLES) THEN
       DO IP = 1,NLP
          LP => LAGRANGIAN_PARTICLE(IP)
          LPC => LAGRANGIAN_PARTICLE_CLASS(LP%CLASS_INDEX)
@@ -1302,7 +1336,10 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
          KAPPA_PART(IID,JJD,KKD) = KAPPA_PART(IID,JJD,KKD) + AREA_VOLUME_RATIO
          KFST4_PART(IID,JJD,KKD) = KFST4_PART(IID,JJD,KKD) + FOUR_SIGMA*AREA_VOLUME_RATIO*LP%ONE_D%TMP_F**4
       ENDDO
+      ENDIF
    ENDIF
+
+
 
    ! Compute absorption coefficient of the gases, KAPPA_GAS
 
@@ -1790,8 +1827,15 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
                            ENDIF
                         ENDIF
                      CASE(2:)
-                        LP%ONE_D%ILW(N,IBND) = ORIENTATION_FACTOR(N,LP%ORIENTATION_INDEX)*RSA(N)* &
-                                               IL(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG)
+                           If(NEW_PART_KAPPA) THEN
+                           LP%ONE_D%ILW(N,IBND) =ORIENTATION_FACTOR(N,LP%ORIENTATION_INDEX)*RSA(N)* &
+                                                 IL(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG)*KAPPA_PART(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG)*&
+                                                 DX(LP%ONE_D%IIG)*DY(LP%ONE_D%JJG)*DZ(LP%ONE_D%KKG)/(LP%PWT*LP%ONE_D%AREA)
+                           ELSE
+                           LP%ONE_D%ILW(N,IBND) = ORIENTATION_FACTOR(N,LP%ORIENTATION_INDEX)*RSA(N)* &
+                                                  IL(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG)
+                           ENDIF
+                  
                   END SELECT
                ENDDO PARTICLE_RADIATION_LOOP
             ENDIF
@@ -1855,7 +1899,14 @@ IF (SOLID_PARTICLES .AND. UPDATE_INTENSITY) THEN
             LP%ONE_D%QRADIN = LP%ONE_D%EMISSIVITY*(WEIGH_CYL*SUM(LP%ONE_D%ILW(1:NUMBER_RADIATION_ANGLES,1:NUMBER_SPECTRAL_BANDS)) &
                                + EFLUX)
          ELSE
-            LP%ONE_D%QRADIN = LP%ONE_D%EMISSIVITY*(0.25_EB*UII(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG) + EFLUX)
+            IF(NEW_PART_KAPPA) THEN
+               LP%ONE_D%QRADIN = LP%ONE_D%EMISSIVITY*(UII(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG)*&
+                                                   KAPPA_PART(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG)*&
+                                                   DX(LP%ONE_D%IIG)*DY(LP%ONE_D%JJG)*DZ(LP%ONE_D%KKG)/(LP%PWT*LP%ONE_D%AREA) + EFLUX)
+            ELSE
+               LP%ONE_D%QRADIN = LP%ONE_D%EMISSIVITY*(0.25_EB*UII(LP%ONE_D%IIG,LP%ONE_D%JJG,LP%ONE_D%KKG) + EFLUX)
+            ENDIF
+
          ENDIF
          IF (LPC%SOLID_PARTICLE) LP%ONE_D%QRADOUT = LP%ONE_D%EMISSIVITY*SIGMA*LP%ONE_D%TMP_F**4
       ENDIF
