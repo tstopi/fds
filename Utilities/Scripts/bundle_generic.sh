@@ -3,7 +3,6 @@
 # this script is called by BUNDLE_linux64.sh and BUNDLE_osx64.sh
 
 errlog=/tmp/errlog.$$
-OPENMPI_VERSION=2.1.0
 
 # -------------------- SCP -------------------
 
@@ -14,7 +13,6 @@ SCP ()
   FROMFILE=$3
   TODIR=$4
   TOFILE=$5
-
   scp $HOST\:$FROMDIR/$FROMFILE $TODIR/$TOFILE 2>/dev/null
   if [ -e $TODIR/$TOFILE ]; then
     echo "$FROMFILE copied from host:$HOST"
@@ -132,13 +130,10 @@ smokediff=smokediff$FDSOS
 backgrounddir=intel$FDSOS
 background=background
 
-fdsdir=intel$FDSOS
-fds=fds_intel$FDSOS
-
 openmpidir=~/FDS_Guides
 
-fdsmpidir=mpi_intel$FDSOS
-fdsmpi=fds_mpi_intel$FDSOS
+fdsmpidir=mpi_intel$FDSOS$IB
+fdsmpi=fds_mpi_intel$FDSOS$IB
 
 fds2asciidir=intel$FDSOS
 fds2ascii=fds2ascii$FDSOS
@@ -222,13 +217,9 @@ hashfile fds2ascii > hash/fds2ascii.sha1
 cd $CURDIR
 
 if [ "$PLATFORM" == "LINUX64" ]; then
-   ostype=LINUX
-   ossize=intel64
    openmpifile=openmpi_${OPENMPI_VERSION}_linux_64.tar.gz
 fi
 if [ "$PLATFORM" == "OSX64" ]; then
-   ostype=OSX
-   ossize=intel64
    openmpifile=openmpi_${OPENMPI_VERSION}_osx_64.tar.gz
 fi
 
@@ -239,7 +230,7 @@ if [ "$OSXBUNDLE" == "yes" ]; then
   CP $fds_bundle FDS-SMV_OSX_Launcher.app.zip $bundledir/bin FDS-SMV_OSX_Launcher.app.zip
 fi
 
-CP $fds_bundle README.html   $bundledir/bin README.html
+CP $fds_bundle README_repo.html   $bundledir/Documentation README_repo.html
 
 CP $smv_bundle smokeview.ini $bundledir/bin smokeview.ini
 
@@ -322,7 +313,7 @@ echo Compressing archive
 gzip    ../$bundlebase.tar
 echo Creating installer
 cd ..
-$makeinstaller -o $ostype -i $bundlebase.tar.gz -d $INSTALLDIR $bundlebase.sh
+$makeinstaller -i $bundlebase.tar.gz -d $INSTALLDIR $bundlebase.sh
 
 cat $bundledir/bin/hash/*.sha1 >  $bundlebase.sha1
 hashfile $bundlebase.sh        >> $bundlebase.sha1
