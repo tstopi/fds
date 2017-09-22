@@ -58,6 +58,7 @@ function usage {
   echo " -s   - stop job"
   echo " -u   - use development version of FDS"
   echo " -t   - used for timing studies, run a job alone on a node"
+  echo " -T   - use the ethernet version  of FDS"
   echo " -w time - walltime, where time is hh:mm for PBS and dd-hh:mm:ss for SLURM. [default: $walltime]"
   echo ""
   exit
@@ -76,13 +77,10 @@ if [ "`uname`" != "Darwin" ]; then
 fi
 MPIRUN=
 ABORTRUN=n
-IB=
+IB=ib
 DB=
 JOBPREFIX=
 OUT2ERROR=
-if [ "$FDSNETWORK" == "infiniband" ] ; then
-  IB=ib
-fi
 EMAIL=
 
 # --------------------------- parse options --------------------
@@ -122,7 +120,7 @@ fi
 
 # read in parameters from command line
 
-while getopts 'AbB:cd:e:E:f:iIhHj:l:m:NO:P:n:o:p:q:rstuw:v' OPTION
+while getopts 'AbB:cd:e:E:f:iIhHj:l:m:NO:P:n:o:p:q:rstTuw:v' OPTION
 do
 case $OPTION  in
   A)
@@ -203,6 +201,9 @@ case $OPTION  in
    ;;
   t)
    benchmark="yes"
+   ;;
+  T)
+   IB=
    ;;
   u)
    use_devel=1
@@ -352,11 +353,16 @@ fi
       MPILABEL="IMPI"
     fi
   else
-    MPIRUNEXE=$MPIDIST/bin/mpirun
-    if [ "$FDSNETWORK" == "infiniband" ]; then
-      MPILABEL="MPI_IB"
-    else
+    MPIRUNEXE=mpirun
+    notfound=`$MPIRUNEXE -h |& head -1 | grep "not found" | wc -l`
+    if [ $notfound -eq 1 ]; then
+      echo "*** error: $MPIRUNEXE not in PATH"
+      exit
+    fi
+    if [ "$IB" == "" ]; then
       MPILABEL="MPI"
+    else
+      MPILABEL="MPI_IB"
     fi
   fi
   TITLE="$infile($MPILABEL)"
