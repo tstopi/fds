@@ -20,10 +20,15 @@ OMPPLACES=
 OMPPROCBIND=
 HELP=
 FDS_MODULE_OPTION=1
+
 ncores=8
 if [ "`uname`" != "Darwin" ]; then
   ncores=`grep processor /proc/cpuinfo | wc -l`
 fi
+if [ "$NCORES_COMPUTENODE" != "" ]; then
+  ncores=$NCORES_COMPUTENODE
+fi
+
 MPIRUN=
 ABORTRUN=n
 DB=
@@ -291,14 +296,28 @@ else
     DB=_dv
   fi
   if [ "$use_intel_mpi" == "1" ]; then
-    exe=$FDSROOT/fds/Build/impi_intel_linux_64$DB/fds_impi_intel_linux_64$DB
+    if [ "$exe" == "" ]; then
+      exe=$FDSROOT/fds/Build/impi_intel_linux_64$DB/fds_impi_intel_linux_64$DB
+    fi
   fi
   if [ "$exe" == "" ]; then
     exe=$FDSROOT/fds/Build/mpi_intel_linux_64$DB/fds_mpi_intel_linux_64$DB
   fi
 fi
 
-# modules loaded currrently
+# check to see if fds was built using Intel MPI
+
+if [ -e $exe ]; then
+  if [ "$use_mpi_intel" == "" ]; then
+    is_intel_mpi=`echo "" | $exe |& grep MPI | grep library | grep Intel | wc -l`
+    if [ "$is_intel_mpi" == "1" ]; then
+         use_intel_mpi=1
+         nosocket="1"
+    fi
+  fi
+fi
+
+# modules loaded currently
 
 if [ "$STARTUP" == "" ]; then
 
@@ -378,16 +397,28 @@ fi
 # define MPIRUNEXE and do some error checking
 
 if [ "$use_intel_mpi" == "1" ]; then # using Intel MPI
-  if [ "$I_MPI_ROOT" == "" ]; then
-    echo "Intel MPI environment not setup. Run aborted."
-    ABORTRUN=y
-  else
-    MPIRUNEXE=$I_MPI_ROOT/bin64/mpiexec
+  if [ "$use_installed" == "1" ]; then
+    MPIRUNEXE=$fdsdir/mpiexec
     if [ ! -e $MPIRUNEXE ]; then
-      echo "Intel mpiexec, $MPIRUNEXE, does not exist. Run aborted."
-      ABORTRUN=y
+      echo "$MPIRUNEXE not found"
+      echo "Run aborted"
+      ABORT=y
     fi
     MPILABEL="IMPI"
+  else
+    if [ "$I_MPI_ROOT" == "" ]; then
+      echo "Intel MPI environment not setup. Run aborted."
+      ABORTRUN=y
+    else
+      MPIRUNEXE=$I_MPI_ROOT/bin64/mpiexec
+      if [ ! -e $MPIRUNEXE ]; then
+        echo "Intel mpiexec, $MPIRUNEXE, not found at:"
+        echo "$MPIRUNEXE"
+        ABORTRUN=y
+        echo "Run aborted"
+      fi
+      MPILABEL="IMPI"
+    fi
   fi
 else                                 # using OpenMPI
   if [ "$OPENMPI_PATH" != "" ]; then
@@ -580,8 +611,7 @@ export OMP_NUM_THREADS=$nopenmp_threads
 EOF
 
 if [ "$use_intel_mpi" == "1" ]; then
-  cat << EOF >> $scriptfile
-export I_MPI_FABRICS=shm:dapl
+cat << EOF >> $scriptfile
 export I_MPI_DEBUG=5
 EOF
 fi
@@ -624,6 +654,9 @@ if [ "$queue" != "none" ]; then
   echo "         Executable:$exe"
   if [ "$OPENMPI_PATH" != "" ]; then
     echo "            OpenMPI:$OPENMPI_PATH"
+  fi
+  if [ "$use_intel_mpi" != "" ]; then
+    echo "           Intel MPI"
   fi
 
 # output currently loaded modules and modules when fds was built if the
