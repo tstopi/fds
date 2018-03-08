@@ -131,7 +131,7 @@ where Pr and Pr$_{\rm t}$ are the molecular and turbulent Prandtl numbers  (Pr$_
 \label{eqn_friction_temperature}
 T_{\tau} \equiv \frac{\dot{q}_{\rm c}''}{{\rho}{c_p}{u_{\tau}}}
 \end{equation}
-where $\dot{q}_{\rm c}''$, $\rho$, and $c_p$ are the convective heat flux at the wall, the gas density, and the specific heat, respectively.
+where $\dot{q}_{\rm c}''$, $\rho$, $c_p$ and $u_{\tau}$  are the convective heat flux at the wall, the gas density, the specific heat, and the friction velocity, respectively.
 
 The second term, $B_T$, on the right hand side of Eq.~\ref{eqn_t_loglaw} is a function of the molecular Prandtl number and can be determined experimentally. Mathematically, this term is the integration constant stemming from the relation between velocity and temperature gradients. Physically, it represents the resistance to the heat and momentum transport close to the wall. FDS uses the experimental correlation proposed by Kader~\cite{Kader:1981}
 \begin{align}
@@ -175,7 +175,7 @@ where $\rho_{\rm s}$ is the density of the composite material and $Y_\alpha$ is 
 \ee
 and the volume fraction of component $\alpha$ is computed as
 \be
-  X_\alpha = \frac{\rho_{\rm s,\alpha}}{\rho_\alpha}  \left/ \sum_{\alpha'=1}^{N_{\rm m}}\frac{\rho_{\rm s,\alpha'}}{\rho_{\alpha'} }  \right.
+  X_\alpha = \frac{\rho_{\rm s,\alpha}}{\rho_\alpha}  \left/ \sum_{\beta=1}^{N_{\rm m}}\frac{\rho_{\rm s,\beta}}{\rho_{\beta} }  \right.
   \label{volfrac}
 \ee
 where $\rho_\alpha$ is the true density of material $\alpha$. Multi-component solids are defined by specifying the mass fractions, $Y_\alpha$, and densities, $\rho_\alpha$, of the individual components of the composite.
@@ -191,24 +191,34 @@ The governing equation solved in {\ct HT3D} is
   \rho_{\rm s} c_{\rm s} \; \dod{T_{\rm s}}{t} = \dod{}{x_i} \left( k_{\rm s} \dod{T_{\rm s}}{x_i} \right)
   \label{eq:3dheat}
 \end{equation}
-Thermal properties are treated the same as in the 1D heat conduction model.  Though the thermal properties may be ramped in time, the temporal variation in the properties is not accounted for in the energy equation (that is, $\rho_{\rm s}$ and $c_{\rm s}$ are pulled outside the time derivative and this commutative error is not repaired).
+Thermal properties are treated the same as in the 1D heat conduction model.  Though the thermal properties may be ramped in time, the temporal variation in the properties is not accounted for in the energy equation. (That is, $\rho_{\rm s}$ and $c_{\rm s}$ are pulled outside the time derivative and this commutative error is not repaired.)
 
-Equation (\ref{eq:3dheat}) is discretized with a second-order finite-volume scheme for fluxes and time integrated with explicit Euler, with an update taking place during the {\ct CORRECTOR} step of the overall FDS time integration scheme.  The ``solid temperature'' is stored in the cell center using the {\ct TMP} array (which also houses the gas phase cell temperatures).  Thermal properties at face centers are taken as averages of the neighboring cell values. Intercell flux values are continuous.  In other words, the scheme is fully conservative.  The time step is chosen to be the minimum of the LES time step, $\delta t$, and the time step required for $\mathrm{VN}=0.25$ in order to satisfy accuracy and stability constraints.
+Equation (\ref{eq:3dheat}) is discretized with a second-order finite-volume scheme for fluxes and time integrated with explicit Euler, with an update taking place during the {\ct CORRECTOR} step of the overall FDS time integration scheme.  The ``solid temperature'' is stored in the cell center using the {\ct TMP} array (which also houses the gas phase cell temperatures).  The intercell fluxes are continuous.  If the {\ct OBST} material properties of neighboring cells are the same, then thermal properties at face centers are taken as linear averages when computing the intercell flux.  If the neighboring cells have different material properties (consider the $x$ direction with cell indices $i$ and $i+1$), then the cell interface temperature, $T_{s,i+\frac{1}{2}}$, is computed as follows:
+\begin{equation}
+\label{eq:interface_tmp}
+T_{{\rm s},i+\frac{1}{2}}^n = \frac{T_{{\rm s},i}^n + \left[\frac{k_{{\rm s},i+1}}{k_{{\rm s},i}} \frac{\delta x_i}{\delta x_{i+1}}\right] T_{{\rm s},i+1}^n}{1 + \left[\frac{k_{{\rm s},i+1}}{k_{{\rm s},i}} \frac{\delta x_i}{\delta x_{i+1}}\right]}
+\end{equation}
+The intercell flux at time level $n$ may be obtained from either of the following (in practice the first relationship is used):
+\begin{equation}
+\label{eq:intercell_flux}
+\left. k_{\rm s} \dod{T_{\rm s}}{x} \right|_{i+\frac{1}{2}} = k_{{\rm s},i} \frac{T_{{\rm s},i+\frac{1}{2}}^n - T_{{\rm s},i}^n}{\frac{1}{2}\delta x_i} = k_{{\rm s},i+1} \frac{T_{{\rm s},i+1}^n - T_{{\rm s},i+\frac{1}{2}}^n}{\frac{1}{2}\delta x_{i+1}}
+\end{equation}
+The time step is chosen to be the minimum of the LES time step, $\delta t$, and the time step required for $\mathrm{VN}=0.5$ in order to satisfy accuracy and stability constraints.
 
 For two-way coupling between the gas and solid phase (implemented by setting {\ct HT3D=.TRUE.} on {\ct SURF}), the boundary condition is continuity of heat flux and temperature.  On the gas phase side, the heat fluxes are due to convection and radiation, and on the solid phase side the heat flux is due to conduction.  The surface temperature links all these fluxes at an instant in time.  Let $T_{\rm w}$ denote the interface temperature between the gas and solid, the face temperature of the ``wall'' cell.  The flux continuity boundary condition implies
 \begin{equation}
 \label{eq:fluxcontinuity}
 \dot{q}_{\rm r, in}'' - \dot{q}_{\rm r, out}'' + \dot{q}_{\rm c}'' = -k_{\rm s} \left. \frac{\partial T_{\rm s}}{\partial n} \right|_{\rm w}
 \end{equation}
-To obtain the surface temperature, we take $\dot{q}_{\rm r, in}''$ from Eq.~(\ref{RFluxIn1}), linearize $\dot{q}_{\rm r, out}''$, and use Eq.~(\ref{eq:qconv}) for $\dot{q}_{\rm c}''$. The flux condition may then be discretized as
+To obtain the surface temperature, we take $\dot{q}_{\rm r, in}''$ from Eq.~(\ref{RFluxIn1}), linearize $\dot{q}_{\rm r, out}''$ using Eq.~(\ref{T_taylor}), and use Eq.~(\ref{eq:qconv}) for $\dot{q}_{\rm c}''$. The flux condition may then be discretized as
 \begin{equation}
 \label{eq:discflux}
-( \dot{q}_{\rm r, in}'' )^n - \varepsilon^n \sigma \, (T_{\rm w}^n)^3 \, T_{\rm w}^{n+1} + h^n (T_{\rm g}^n - T_{\rm w}^{n+1}) = -2 \, k_{\rm s}^n \, \frac{T_{\rm s}^n - T_{\rm w}^{n+1}}{\delta n}
+( \dot{q}_{\rm r, in}'' )^n + 3 \varepsilon^n \sigma \, (T_{\rm w}^n)^4 - 4 \varepsilon^n \sigma \, (T_{\rm w}^n)^3 \, T_{\rm w}^{n+1} + h^n (T_{\rm g}^n - T_{\rm w}^{n+1}) = -2 \, k_{\rm s}^n \, \frac{T_{\rm s}^n - T_{\rm w}^{n+1}}{\delta n}
 \end{equation}
 which leads to our final result for the boundary temperature
 \begin{equation}
 \label{eq:tmpwall}
-T_{\rm w}^{n+1} = \frac{ ( \dot{q}_{\rm r, in}'' )^n + h^n \, T_{\rm g}^n + 2 \, k_{\rm s}^n \, T_{\rm s}^n/\delta n }{ \varepsilon^n \sigma \, (T_{\rm w}^n)^3 + h^n + 2 \, k_{\rm s}^n / \delta n}
+T_{\rm w}^{n+1} = \frac{ ( \dot{q}_{\rm r, in}'' )^n + 3 \varepsilon^n \sigma \, (T_{\rm w}^n)^4 + h^n \, T_{\rm g}^n + 2 \, k_{\rm s}^n \, T_{\rm s}^n/\delta n }{ 4 \varepsilon^n \sigma \, (T_{\rm w}^n)^3 + h^n + 2 \, k_{\rm s}^n / \delta n}
 \end{equation}
 
 \newpage
@@ -378,20 +388,21 @@ The gravitational settling velocity is given by~\cite{Davies_Charles}
 u_{\rm g} = g m_{\rm a} \frac{\text{Cn}}{6 \pi \, \chi_{\rm d} \, \mu \, r_{\rm a}}
 \ee
 where $m_{\rm a}$ is the particle mass, $\chi_{\rm d}$ is a shape factor, $\mu$ is the dynamic viscosity of air,
-$r_a$ is the particle radius, and Cn is the Cunningham slip correction factor given by~\cite{Cunningham:1}
+$r_a$ is the particle radius, and Cn is the Cunningham slip correction factor given by~\cite{Davies_Charles}
 \be
-\text{Cn} = 1 + 1.25 \; \text{Kn} + 0.41 \; \text{Kn} \; \mathrm{e}^{-0.88/\text{Kn}}
+\text{Cn} = 1 + 1.257 \; \text{Kn} + 0.4 \; \text{Kn} \; \mathrm{e}^{-1.1/\text{Kn}}
 \ee
 where Kn is the particle Knudsen number given by the ratio of the mean free path of the gas
-to the particle radius. The mean free path of a gas is proportional to its temperature,
-thus Kn is computed as~\cite{Sippola:1}
+to the particle radius. Kn is computed as~\cite{Sippola:1}
 \be
-\text{Kn} = \frac{\lambda}{r_{\rm a}} \frac{T_{\rm g}}{T_\infty}
+\text{Kn} = \frac{\lambda}{r_{\rm a}}
 \ee
-where $\lambda$ is the mean free path of gas molecules and is 0.065 $\mu$m at a temperature of 25 $^\circ$C and atmospheric pressure.
-
+where $\lambda$ is the mean free path of gas molecules which is computed as~\cite{Jennings_S_G}
+\be
+\lambda = \mu_g \; \sqrt {\frac {\pi}{2 \; p \; \rho_g} }
+\ee
 For each aerosol species in the gas phase, a gravitational settling velocity is calculated
-and imposed on the convective term (in the z-direction) in the species transport
+and imposed on the convective term in the species transport
 equation~(Eq.~\ref{species}). This approach is similar to the drift flux model
 for smoke transport described in Hu et al.~\cite{Hu:1}. The gravitational settling velocity
 is also included in the total deposition velocity to deposit aerosols onto upward-facing flat surfaces,
@@ -416,6 +427,9 @@ $K_{\rm th}$ is the thermophoretic velocity coefficient and is calculated using 
 where $C_{\rm s}=1.17$ is the thermal slip coefficient, $\alpha$ is the ratio of the gas
 conductivity to the particle conductivity, $C_{\rm m}=1.14$ is the momentum accommodation
 coefficient, and $C_{\rm t}=2.18$ is the thermal accommodation coefficient.
+
+For each aerosol species in the gas phase, a thermophoretic velocity is calculated and imposed on the convective term in the species transport equation~(Eq.~\ref{species}). This approach follows the drift flux model
+for smoke transport described in Hu et al.~\cite{Hu:1}.
 
 \subsection{Turbulent Deposition}
 
