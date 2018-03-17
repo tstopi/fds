@@ -19,15 +19,25 @@ Fuel_name    = {'Methane','Propane'};
 fuel_hoc     = [50010.3475,46334.6246]; % from .out file
 git_tag_ext  = '_XO2_ramp_dx_1p25cm_git.txt';
 
-line_fmt = {'ro-','mo-','bo-','r^-','m^-','b^-'};
-key_fmt  = {'1step, dx=1.25cm','1step, dx=0.625cm','1step, dx=0.3125cm','2step, dx=1.25cm','2step, dx=0.625cm','2step, dx=0.3125cm'};
+% line_fmt = {'ro-','mo-','bo-','r^-','m^-','b^-'};
+% key_fmt  = {'1step, dx=1.25cm','1step, dx=0.625cm','1step, dx=0.3125cm','2step, dx=1.25cm','2step, dx=0.625cm','2step, dx=0.3125cm'};
+
+% case_name = {'_XO2_ramp_dx_1p25cm',...
+%              '_XO2_ramp_dx_p625cm',...
+%              '_XO2_ramp_dx_p3125cm',...
+%              '_2step_XO2_ramp_dx_1p25cm',...
+%              '_2step_XO2_ramp_dx_p625cm',...
+%              '_2step_XO2_ramp_dx_p3125cm'};
+
+% omit high res cases ---------------------------
+line_fmt = {'ro-','mo-','r^-','m^-'};
+key_fmt  = {'1step, dx=1.25cm','1step, dx=0.625cm','2step, dx=1.25cm','2step, dx=0.625cm',};
 
 case_name = {'_XO2_ramp_dx_1p25cm',...
              '_XO2_ramp_dx_p625cm',...
-             '_XO2_ramp_dx_p3125cm',...
              '_2step_XO2_ramp_dx_1p25cm',...
-             '_2step_XO2_ramp_dx_p625cm',...
-             '_2step_XO2_ramp_dx_p3125cm'};
+             '_2step_XO2_ramp_dx_p625cm'};
+% -----------------------------------------------
 
 for i_fuel = 1:2 % i_fuel_loop
 
@@ -106,6 +116,7 @@ for i_fuel = 1:2 % i_fuel_loop
 
     set(gcf,'Visible',Figure_Visibility);
     set(gcf,'Units',Paper_Units);
+    set(gcf,'PaperUnits',Paper_Units);
     set(gcf,'PaperSize',[Paper_Width Paper_Height]);
     set(gcf,'Position',[0 0 Paper_Width Paper_Height]);
     print(gcf,'-dpdf',[pltdir,fuel_name{i_fuel},'_global_Chi_R']);
@@ -128,6 +139,7 @@ for i_fuel = 1:2 % i_fuel_loop
 
     set(gcf,'Visible',Figure_Visibility);
     set(gcf,'Units',Paper_Units);
+    set(gcf,'PaperUnits',Paper_Units);
     set(gcf,'PaperSize',[Paper_Width Paper_Height]);
     set(gcf,'Position',[0 0 Paper_Width Paper_Height]);
     print(gcf,'-dpdf',[pltdir,fuel_name{i_fuel},'_eta']);

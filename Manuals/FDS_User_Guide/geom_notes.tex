@@ -9,69 +9,158 @@
 \begin{document}
 \bibliographystyle{unsrt}
 
-
 \vspace{1.0in}
-\section{Unstructured Geometry: The \texorpdfstring{{\ct GEOM}}{GEOM} Namelist Group (Table \ref{tbl:GEOM})}
-\label{info:GEOM}
-\subsection{Defining Surfaces}
 
-\subsubsection{General Surfaces}
-Unstructured geometric surfaces are defined using the {\ct \&GEOM}\ namelist.
-These surfaces consist of a collection of triangular faces where each face consists of three vertices.
-A simple form of the {\ct \&GEOM}\ namelist defining one triangular face is given by
+% To compile geom_notes:
+%
+% 1. Make sure you updated your repo and compiled the latest produciton version of fds.
+%
+% 2. Go to fds/Manuals/FDS_User_Guide/
+%
+% 3. Type:
+%
+% [mnv@burn FDS_User_Guide]$ ./make_geom_figures.sh -J
+%
+% The -J is for the case where you compiled the target in fds/Build/impi_intel_linux_64 (ifort + intel mpi). If you don't use this flag, 
+% it assumes running with the target in fds/Build/mpi_intel_linux_64 (ifort + openmpi).
+% This script runs all the cases necessary to make smokeview figures, runs smokeview in batch mode and makes these figs. They are saved in 
+% fds/Manuals/FDS_User_Guide/SCRIPT_FIGURES.
+%
+% 4. Use your latex editor to compile geom_notes.tex or type:
+% 
+% [mnv@burn FDS_User_Guide]$ ./make_geom_notes.sh
+%
+% You should get the geom_notes.pdf in the same directory.
+
+
+\chapter{Building the Model (FIXME UG Chapter 7)}
+
+\textbf{FIXME}: [EG] in the following paragraph modifications are \underline{underlined}
+
+A considerable amount of work in setting up a calculation lies in specifying the geometry of the space to
+be modeled and applying boundary conditions to the solid surfaces. The geometry is described in terms of
+\underline{solids} that can heat up, burn, conduct heat, etc.; and vents from which air or fuel can be
+either injected into, or drawn from, the flow domain. A boundary condition needs to be assigned to each
+\underline{solid surface} and vent describing its thermal properties. A fire is just one type of boundary condition.
+This chapter describes how to build the model.
+
+\textbf{FIXME}: the following text is written following the structure of the {\ct OBST} namelist section
+
+\section{Creating Unstructured Solids: The \texorpdfstring{{\ct GEOM}}{GEOM} Namelist Group (Table \ref{tbl:GEOM})}
+\label{info:GEOM}
+
+The namelist {\ct GEOM}\ describes one or more unstructured closed geometric surfaces that enclose solid portions
+of the fluid domain. These surfaces consist of a collection of triangular faces, where each face is built
+from three vertices. The user can assign a specific boundary condition to each of the faces.
+
+\subsection{Basics}
+\label{info:GEOM_Basics}
+
+A simple form of the {\ct \&GEOM}\ namelist defining an unstructured solid is given by
 
 \begin{verbatim}
-&GEOM ID='triangle'
-      VERTS=0.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,1.0,
-      FACES=1,2,3
+&GEOM ID='UNSTRUCTURED_SOLID',
+      SURF_ID='FIRE','INERT',
+      VERTS= -1.0, -1.0,  0.0, 
+              1.0, -1.0,  0.0, 
+              0.0,  1.0,  0.0, 
+              0.0,  0.0,  1.0,
+      FACES= 1,3,2, 2,  
+             1,4,3, 1,  
+             3,4,2, 1,  
+             2,4,1, 0,  
 /
 \end{verbatim}
 
-\noindent where {\ct ID}\ specifies the object name, in this case {\ct triangle},
-{\ct VERTS}\ specifies a list of one or more $(x,y,z)$ coordinates and {\ct FACES}\ specifies a list of vertices, 3 vertex indices for each
-face. Each index ranges from 1 to the number of vertices found on this {\ct \&GEOM}\ line.
+\noindent where {\ct ID}\ specifies the solid name, in this case {\ct UNSTRUCTURED\_SOLID},
+{\ct VERTS}\ specifies the $(x_1,y_1,z_1, \quad x_2,y_2,z_2, \quad ...)$ coordinates of the vertices,
+and {\ct FACES}\ specifies a list of triangular faces and the {\ct SURF\_ID}\ that should be
+assigned to each of them.
 
-One may also define particular kinds of geometric objects,  blocks using {\ct XB}, spheres using {\ct SPHERE\_ORIGIN}\ and {\ct SPHERE\_RADIUS}
-and a 2D surface using {\ct ZVALS}.
-FDS generate vertices and faces to represent these objects, equivalent to what would have been defined using {\ct VERTS}\ and {\ct FACES}.
+A triangular face is defined by 3 vertex indices and one boundary condition index: $(v_1,v_2,v_3,b)$.
+Each vertex index $(v_i)$ ranges from 1 to the number of vertices found in the {\ct VERTS} parameter.
+The order of the 3 vertex indices in the face defines which side of the triangle is considered facing
+the outside of the solid. Observed from the outside, the vertices of each triangle should always appear
+to have a counter-clockwise winding order, so that their order rotates counter-clockwise around the
+triangle's center and the face normal vector is oriented according to the right-hand rule.
+
+The boundary condition index $b$ ranges from 0 to the number of boundary condition {\ct IDs} found in
+the {\ct SURF\_ID} parameter. A value greater than 0 designates, through the {\ct SURF\_ID} list, which  
+{\ct SURF} line (Section~\ref{info:SURF}) to apply at the selected face. This index $b$ is always defined locally to the
+{\ct GEOM SURF\_ID} surface list. A value equal to 0 applies the \textit{default} boundary condition to the selected face.
+Therefore, in the above example, the first face has an index $b=2$ which corresponds to the {\ct 'INERT'} surf ID, the 
+second and third faces have $b=1$ and are of type {\ct 'FIRE'}, and the fourth will be of \textit{default} surface ID.
+
+\subsection{Triangulated surfaces quality}
+
+In order for FDS to correctly detect the solid portion of the volume from the rest of the fluid domain,
+some tests are performed at start on the quality of the triangulated surfaces.
+
+First of all, no \textit{degenerate geometry} is allowed.
+In a collection of vertices and faces of a {\ct \&GEOM}\ namelist:
+
+\begin{itemize}
+\item each vertex must be unique and shared by edges,
+\item each edge connecting face vertices must be shared by two faces and have a non-zero length,
+\item each face cannot intersect the others and must have a non-zero area.
+\end{itemize}
+
+Furthermore the {\ct \&GEOM}\ namelist shall represent \textit{closed}, \textit{manifold}, \textit{orientable} surfaces.
+The surfaces may define one or more distinct volumes, that do not need to be \textit{connected}.
+
+\textbf{FIXME}: [EG] insert a picture of well behaved surfaces that define non-connected spaces, with normals displayed
+
+A triangulated surface is said to be a \textit{manifold} and \textit{closed} if each edge is shared by exactly two faces.
+A manifold mesh is \textit{orientable} if the vertex orderings for the faces can be chosen so that adjacent faces
+have consistent normals. For example a Möbius strip is open and non-orientable.
+
+\textbf{FIXME}: [EG] insert a picture of various common types of flaws in triangulated surfaces.
+
+\subsection{Self-generated geometries}
+
+The {\ct \&GEOM}\ namelist allows the quick definition of particular kinds of geometric objects, blocks using {\ct XB}, spheres using {\ct SPHERE\_ORIGIN}\ and {\ct SPHERE\_RADIUS}
+and a 2D terrain elevations using {\ct ZVALS}. FDS generates vertices and faces to represent these objects, equivalent to what would have been defined using {\ct VERTS}\ and {\ct FACES}.
 
 \subsubsection{Blocks}
-A {\ct \&GEOM}\ namelist defining a block is given by
+A {\ct GEOM}\ namelist defining a block is given by
 
 \begin{verbatim}
 &GEOM ID='block'
-      XB=0.0,1.0,0.0,1.0,0.0,1.0 /
+      XB=0.0,1.0,0.0,1.0,0.0,1.0
+/
 \end{verbatim}
 
 \noindent where {\ct XB=xmin,xmax,ymin,ymax,zmin,zmax} defines the min and max bounds of the block.
 The {\ct XB}\ parameter is used in the same way as on an {\ct \&OBST}\ or {\ct \&VENT}\ line.
-A block may be discretized into many parts by
-specifying the {\ct IJK} parameter.  For example, {\ct IJK=8,6,4} would split the block
-into 8 parts along the $x$ dimension, 6 parts along the $y$ dimension and 4 parts along
-the $z$ dimension. By default, blocks are discretized
-so that the block faces are consistent in size with the grid resolution.
+A block may be refined into many parts by specifying the {\ct IJK} parameter.
+For example, {\ct IJK=8,6,4} would split the block into 8 parts along the $x$ dimension,
+6 parts along the $y$ dimension and 4 parts along the $z$ dimension.
+By default, blocks are discretized so that the block faces are consistent in size with the grid resolution.
 
 \subsubsection{Spheres}
-A {\ct \&GEOM}\ namelist defining a sphere centered at $(0,0,0)$ with radius $1$ is given by
+A {\ct GEOM}\ namelist defining a sphere centered at $(0,0,0)$ with radius $1$ is given by
 
 \begin{verbatim}
 &GEOM ID='sphere'
-      SPHERE_ORIGIN=0.0,0.0,0.0,SPHERE_RADIUS=1.0 /
+      SPHERE_ORIGIN=0.0,0.0,0.0, SPHERE_RADIUS=1.0
+/
 \end{verbatim}
 
 \noindent Spheres are discretized by default so that each face is consistent in size with the grid resolution.
-One may specify a {\ct N\_LEVEL}\ parameter which specifies the number of times the sphere is split.
+One may specify a {\ct N\_LEVEL}\ parameter which defines the number of times the sphere is split.
 
-\subsubsection{2D Surfaces}
-A {\ct \&GEOM}\ namelist defining a 2D surface is given by
+\subsubsection{2D Terrain elevations}
+A {\ct \&GEOM}\ namelist defining a 2D terrain elevation is given by
 
 \begin{verbatim}
-&GEOM ID='terrain'
-      IJK=ivals,jvals,XB=xmin,xmax,ymin,ymax,ZVALS=..... /
+&GEOM ID='terrain',
+      IJK=ivals,jvals, XB=xmin,xmax,ymin,ymax, ZVALS=...
+/
 \end{verbatim}
 
-\noindent where {\ct XB}\ defines a rectangular region bounded by xmin, xmax, ymin and ymax where elevation data is defined with {\ct ZVALS}.
-{\ct IJK}\ specifies how many vertices occur in this region along each dimension in this region.
+\noindent where {\ct XB}\ defines a rectangular region bounded by $(x_{min}, x_{max}, y_{min})$ and $(y_{max})$
+where elevation data is defined with {\ct ZVALS}.
+{\ct IJK}\ specifies how many vertices occur in this region along each dimension.
 In this example {\ct ivals}\ values occur along the x dimension and {\ct jval}\ values occur along the y dimension.
 The {\ct ZVALS} keyword is used to specify elevations at each $(x,y)$ location.
 The elevation data specified after the {\ct ZVALS}\ keyword is arranged in row major order.
@@ -79,25 +168,112 @@ The first row contains {\ct ivals} elevation values occurring at the the ymax po
 Similarly, the last row contains
 {\ct ivals}\ elevation values for the ymin position again from xmin to xmax.
 There are then {\ct jvals}\ rows and {\ct ivals}\ columns of elevation data.
-As with the blocks and spheres, FDS uses the information
-provided by these keywords to construct
+As with the blocks and spheres, FDS uses the information provided by these keywords to construct
 vertices and triangular faces.
 
-\subsection{Defining Solids}
-Unstructured geometric solids are also defined using the {\ct \&GEOM}\ namelist.
-These solids consist of a collection of tetrahedrons where each tetrahedron consists of four vertices.
-A simple form of the {\ct \&GEOM}\ namelist defining one tetrahedron is given by
+\subsection{Generating complex geometries}
 
-\begin{verbatim}
-&GEOM ID='tetrahedron'
-      VERTS=0.0,0.0,0.0, 1.0,0.0,0.0, 1.0,1.0,0.0,  1.0,1.0,1.0,
-      VOLUS=1,2,3,4
-/
-\end{verbatim}
+\textbf{FIXME}: [EG] Useful?
 
-\noindent where {\ct ID}\ specifies the object name, in this case {\ct tetrahedron},
-{\ct VERTS}\ specifies a list of one or more $(x,y,z)$ coordinates and {\ct VOLUS}\ specifies a list of vertices, 4 vertex indices for each
-tetrahedron. Each index ranges from 1 to the number of vertices found on this {\ct \&GEOM}\ line.
+{\ct \&GEOM}\ namelists for complex geometries can be automatically generated using third-party pre-processors
+provided by the FDS-SMV community. The links to this tools can be found at the project home page at https://pages.nist.gov/fds-smv/
+
+The FDS/Smokeview distribution includes an example Python script that transforms a Wavefront .OBJ file,
+an open file format supported by many 3D graphics applications, into {\ct \&GEOM}\ namelists.
+
+
+
+
+
+
+\textbf{FIXME}: from here unmodified text
+
+%\subsection{Defining Surfaces}
+%
+%\subsubsection{General Surfaces}
+%
+%Unstructured geometric surfaces are defined using the {\ct \&GEOM}\ namelist.
+%These surfaces consist of a collection of triangular faces where each face consists of three vertices.
+%A simple form of the {\ct \&GEOM}\ namelist defining one triangular face is given by
+%
+%\begin{verbatim}
+%&GEOM ID='triangle'
+%      VERTS=0.0,0.0,0.0, 1.0,0.0,0.0, 1.0,0.0,1.0,
+%      FACES=1,2,3
+%/
+%\end{verbatim}
+%
+%\noindent where {\ct ID}\ specifies the object name, in this case {\ct triangle},
+%{\ct VERTS}\ specifies a list of one or more $(x,y,z)$ coordinates and {\ct FACES}\ specifies a list of vertices, 3 vertex indices for each
+%face. Each index ranges from 1 to the number of vertices found on this {\ct \&GEOM}\ line.
+%
+%One may also define particular kinds of geometric objects,  blocks using {\ct XB}, spheres using {\ct SPHERE\_ORIGIN}\ and {\ct SPHERE\_RADIUS}
+%and a 2D surface using {\ct ZVALS}.
+%FDS generate vertices and faces to represent these objects, equivalent to what would have been defined using {\ct VERTS}\ and {\ct FACES}.
+%
+%\subsubsection{Blocks}
+%A {\ct \&GEOM}\ namelist defining a block is given by
+%
+%\begin{verbatim}
+%&GEOM ID='block'
+%      XB=0.0,1.0,0.0,1.0,0.0,1.0 /
+%\end{verbatim}
+%
+%\noindent where {\ct XB=xmin,xmax,ymin,ymax,zmin,zmax} defines the min and max bounds of the block.
+%The {\ct XB}\ parameter is used in the same way as on an {\ct \&OBST}\ or {\ct \&VENT}\ line.
+%A block may be discretized into many parts by
+%specifying the {\ct IJK} parameter.  For example, {\ct IJK=8,6,4} would split the block
+%into 8 parts along the $x$ dimension, 6 parts along the $y$ dimension and 4 parts along
+%the $z$ dimension. By default, blocks are discretized
+%so that the block faces are consistent in size with the grid resolution.
+%
+%\subsubsection{Spheres}
+%A {\ct \&GEOM}\ namelist defining a sphere centered at $(0,0,0)$ with radius $1$ is given by
+%
+%\begin{verbatim}
+%&GEOM ID='sphere'
+%      SPHERE_ORIGIN=0.0,0.0,0.0,SPHERE_RADIUS=1.0 /
+%\end{verbatim}
+%
+%\noindent Spheres are discretized by default so that each face is consistent in size with the grid resolution.
+%One may specify a {\ct N\_LEVEL}\ parameter which specifies the number of times the sphere is split.
+%
+%\subsubsection{2D Surfaces}
+%A {\ct \&GEOM}\ namelist defining a 2D surface is given by
+%
+%\begin{verbatim}
+%&GEOM ID='terrain'
+%      IJK=ivals,jvals,XB=xmin,xmax,ymin,ymax,ZVALS=..... /
+%\end{verbatim}
+%
+%\noindent where {\ct XB}\ defines a rectangular region bounded by xmin, xmax, ymin and ymax where elevation data is defined with {\ct ZVALS}.
+%{\ct IJK}\ specifies how many vertices occur in this region along each dimension in this region.
+%In this example {\ct ivals}\ values occur along the x dimension and {\ct jval}\ values occur along the y dimension.
+%The {\ct ZVALS} keyword is used to specify elevations at each $(x,y)$ location.
+%The elevation data specified after the {\ct ZVALS}\ keyword is arranged in row major order.
+%The first row contains {\ct ivals} elevation values occurring at the the ymax position from xmin to xmax.
+%Similarly, the last row contains
+%{\ct ivals}\ elevation values for the ymin position again from xmin to xmax.
+%There are then {\ct jvals}\ rows and {\ct ivals}\ columns of elevation data.
+%As with the blocks and spheres, FDS uses the information
+%provided by these keywords to construct
+%vertices and triangular faces.
+
+%\subsection{Defining Solids}
+%Unstructured geometric solids are also defined using the {\ct \&GEOM}\ namelist.
+%These solids consist of a collection of tetrahedrons where each tetrahedron consists of four vertices.
+%A simple form of the {\ct \&GEOM}\ namelist defining one tetrahedron is given by
+%
+%\begin{verbatim}
+%&GEOM ID='tetrahedron'
+%      VERTS=0.0,0.0,0.0, 1.0,0.0,0.0, 1.0,1.0,0.0,  1.0,1.0,1.0,
+%      VOLUS=1,2,3,4
+%/
+%\end{verbatim}
+%
+%\noindent where {\ct ID}\ specifies the object name, in this case {\ct tetrahedron},
+%{\ct VERTS}\ specifies a list of one or more $(x,y,z)$ coordinates and {\ct VOLUS}\ specifies a list of vertices, 4 vertex indices for each
+%tetrahedron. Each index ranges from 1 to the number of vertices found on this {\ct \&GEOM}\ line.
 
 
 \subsection{Transforming Objects}
@@ -174,20 +350,20 @@ DXYZ(1,3) would specify the translation along the x direction for the third obje
 The {\ct COMPONENT\_ONLY}\ keyword if .TRUE., indicates that the object being defined is only a component found in other geometries.
 It will not appear by itself in the FDS model.
 
-\subsection{Dynamic Objects}
-An object's position and orientation may change with time.
-These changes are specified using various keywords that end with {\ct \_DOT}.
-See Table \ref{tbl:GEOM} for a complete list of these keywords.
-In the following example, {\ct AZIM\_DOT} is used to vary the azimuthal rotation angle by 1 deg/s.
-Similarly, the position may be changed by using {\ct XYZ\_DOT}.
-For example, {\ct XYZ\_DOT=0.0,0.0,1.0}\ would cause an object to move 1~m/s in a vertical direction.
-{\small
-\begin{verbatim}
-&GEOM VERTS=...,FACES=....,AZIM=0.0,AZIM_DOT=1.0 /
-\end{verbatim}
-}
-
-\vspace{\baselineskip}
+%\subsection{Dynamic Objects}
+%An object's position and orientation may change with time.
+%These changes are specified using various keywords that end with {\ct \_DOT}.
+%See Table \ref{tbl:GEOM} for a complete list of these keywords.
+%In the following example, {\ct AZIM\_DOT} is used to vary the azimuthal rotation angle by 1 deg/s.
+%Similarly, the position may be changed by using {\ct XYZ\_DOT}.
+%For example, {\ct XYZ\_DOT=0.0,0.0,1.0}\ would cause an object to move 1~m/s in a vertical direction.
+%{\small
+%\begin{verbatim}
+%&GEOM VERTS=...,FACES=....,AZIM=0.0,AZIM_DOT=1.0 /
+%\end{verbatim}
+%}
+%
+%\vspace{\baselineskip}
 
 \section{\texorpdfstring{{\ct GEOM}}{GEOM} (Unstructured Geometry Parameters)}
 
@@ -204,7 +380,6 @@ For example, {\ct XYZ\_DOT=0.0,0.0,1.0}\ would cause an object to move 1~m/s in 
 \hline \hline
 \endhead
 {\ct AZIM}         & Real                   & Section~\ref{info:GEOM}            &  deg      &    0.0                   \\ \hline
-{\ct AZIM\_DOT}    & Real                   & Section~\ref{info:GEOM}            &  deg/s    &    0.0                   \\ \hline
 {\ct COMPONENT\_ONLY} & LOGICAL             & Section~\ref{info:GEOM}            &           &  {\ct .FALSE.}           \\ \hline
 {\ct DAZIM}        & array of Reals         & Section~\ref{info:GEOM}            &  deg      &    0.0                   \\ \hline
 {\ct DELEV}        & array of Reals         & Section~\ref{info:GEOM}            &  deg      &    0.0                   \\ \hline
@@ -212,12 +387,10 @@ For example, {\ct XYZ\_DOT=0.0,0.0,1.0}\ would cause an object to move 1~m/s in 
 {\ct DXYZ0}        & array of Real Triplets & Section~\ref{info:GEOM}            &   m       &   0.0                    \\ \hline
 {\ct DXYZ}         & array of Real Triplets & Section~\ref{info:GEOM}            &   m       &   0.0                    \\ \hline
 {\ct ELEV}         & Real                   & Section~\ref{info:GEOM}            &  deg      &    0.0                   \\ \hline
-{\ct ELEV\_DOT}    & Real                   & Section~\ref{info:GEOM}            &  deg/s    &    0.0                   \\ \hline
 {\ct FACES}        & array of Integer Triplets     & Section~\ref{info:GEOM}     &           &    0                     \\ \hline
 {\ct GAXIS}        & Real Triplet           & Section~\ref{info:GEOM}            &           &                          \\ \hline
 {\ct GEOM\_IDS}    & Real                   & Section~\ref{info:GEOM}            &           &                          \\ \hline
 {\ct GROTATE}      & Real Triplet           & Section~\ref{info:GEOM}            &  deg      &    0.0                   \\ \hline
-{\ct GROTATE\_DOT}  & Real Triplet          & Section~\ref{info:GEOM}            & deg/s     &    0.0                   \\ \hline
 {\ct ID}           & Character              & Section~\ref{info:GEOM}            &           &   {\ct 'geom'}           \\ \hline
 {\ct IJK}          & Integer Triplet        & Section~\ref{info:GEOM}            &           &   0,0,0                  \\ \hline
 {\ct MATL\_ID}     & Character              & Section~\ref{info:GEOM}            &           &  {\ct 'INERT'}           \\ \hline
@@ -225,7 +398,6 @@ For example, {\ct XYZ\_DOT=0.0,0.0,1.0}\ would cause an object to move 1~m/s in 
 {\ct N\_LEVELS}    & Integer                & Section~\ref{info:GEOM}            &           &   0                      \\ \hline
 {\ct N\_LONG}      & Integer                & Section~\ref{info:GEOM}            &           &   0                      \\ \hline
 {\ct SCALE}        & Real Triplet           & Section~\ref{info:GEOM}            &           &   1.0,1.0,1.0            \\ \hline
-{\ct SCALE\_DOT}   & Real Triplet           & Section~\ref{info:GEOM}            &  1/s      &   1.0                    \\ \hline
 {\ct SPHERE\_ORIGIN}& Real Triplet          & Section~\ref{info:GEOM}            &   m       &  0.0,0.0,0.0             \\ \hline
 {\ct SPHERE\_RADIUS}& Real                  & Section~\ref{info:GEOM}            &   m       &  1.0                     \\ \hline
 {\ct SPHERE\_TYPE} & Integer                & Section~\ref{info:GEOM}            &           &  1                       \\ \hline
@@ -238,8 +410,16 @@ For example, {\ct XYZ\_DOT=0.0,0.0,1.0}\ would cause an object to move 1~m/s in 
 {\ct XB}           & Real sex-tuplet        & Section~\ref{info:GEOM}            &   m       &   0.0                    \\ \hline
 {\ct XYZ0}         & Real Triplet           & Section~\ref{info:GEOM}            &   m       &   0.0                    \\ \hline
 {\ct XYZ}          & Real Triplet           & Section~\ref{info:GEOM}            &   m       &   0.0                    \\ \hline
-{\ct XYZ\_DOT}     & Real Triplet           & Section~\ref{info:GEOM}            &   m/s     &   0.0                    \\ \hline
 {\ct ZVALS}        & Real                   & Section~\ref{info:GEOM}            &   m/s     &   0.0                    \\ \hline
+
+
+% Related to moving geometry:
+%{\ct AZIM\_DOT}    & Real                   & Section~\ref{info:GEOM}            &  deg/s    &    0.0                   \\ \hline
+%{\ct ELEV\_DOT}    & Real                   & Section~\ref{info:GEOM}            &  deg/s    &    0.0                   \\ \hline
+%{\ct GROTATE\_DOT}  & Real Triplet          & Section~\ref{info:GEOM}            & deg/s     &    0.0                   \\ \hline
+%{\ct SCALE\_DOT}   & Real Triplet           & Section~\ref{info:GEOM}            &  1/s      &   1.0                    \\ \hline
+%{\ct XYZ\_DOT}     & Real Triplet           & Section~\ref{info:GEOM}            &   m/s     &   0.0                    \\ \hline
+
 
 \end{longtable}
 
@@ -411,10 +591,24 @@ ENDIF
 \item {\ct SURF\_S, SURF\_D}\ are the static and dynamic SURF indices for each face (color indices for isosurface files.
 \end{itemize}
 
-\section{Some Geometry Implementation Notes}
-The notes written in this section are intended to provide details for various computational geometric algorithms as implemented in FDS and Smokeview.
+
+
+
+
+
+
+
+
+\section{Computational Geometry Technical Notes:}
+
+The notes written in this section are intended to provide details for various computational algorithms as implemented in FDS and Smokeview.
+
+
 
 \subsection{Geometry Properties}
+
+
+
 \subsubsection{Triangle,Polygon}
 Consider the triangle with vertices $v_1$,$v_2$ and $v_3$ as illustrated in Figure \ref{figure:triangle_setup}.
 
@@ -638,13 +832,88 @@ Figure \ref{figure:facelist}.
 \subsection{Boxes}
 \subsection{2D Surfaces}
 
-\section{Examples}
+
+\clearpage
+
+\section{Cut Cell Immersed Boundary Method (CCIBM) Technical Notes}
+
+\paragraph{Abstract} In this chapter, we discuss implementation of a hybrid cutcell direct-forcing immersed boundary method (CIBM) to handle complex geometry in the Fire Dynamics Simulator (FDS).  Particular attention is paid to the challenges associated with thin (zero thickness) obstructions in variable density flows with heat and mass transfer.  The triangular facet is chosen as the basic element for construction of complex geometry.  Reasons behind this choice are discussed.  A linked-list data structure for the facets is presented.  One-sided differencing and methods for overcoming numerical diffusion issues are discussed.  Verification cases for momentum, heat, and mass transport are presented.
+
+\subsection{Introduction}
+
+The Fire Dynamics Simulator (FDS) has always used a simple direct forcing immersed boundary method (IBM) to handle flow obstructions.  Generally, obstructions are restricted to conform to the underlying Cartesian mesh, leading to stair-step approximations to curvilinear geometries (see Fig.~\ref{fig:circle}).
+
+\begin{figure}
+\begin{center}
+\begin{tabular}{cc}
+\begin{tikzpicture}
+\draw[line width=1mm,fill=lightgray] (1.8,1.8) circle [radius=1.5];
+\draw[help lines] (0,0) grid (5,5);
+\draw[ultra thick,->] (2.66,4.5) -- (3.33,4.5);
+\draw[ultra thick,->] (2.66,3.5) -- (3.33,3.5);
+\draw[ultra thick,->] (3.66,4.5) -- (4.33,4.5);
+\draw[ultra thick,->] (3.66,3.5) -- (4.33,3.5);
+\draw[thick] (2.665,3.0255) -- (3.335,3.9745);
+\draw[fill] (3.335,3.9745) circle [radius=0.1];
+\end{tikzpicture}
+\hspace{1cm}&\hspace{1cm}
+\begin{tikzpicture}
+\draw[line width=1mm,fill=lightgray] (1,0) to (1,1) to (0,1) to (0,2) to (1,2) to (1,3) to (3,3) to (3,1) to (2,1) to (2,0) to (.95,0);
+\draw[help lines] (0,0) grid (5,5);
+\end{tikzpicture}
+\end{tabular}
+\caption{(Left) Desired geometry (circle). (Right) FDS representation---a cell is solid if more than half its volume is occupied by the desired geometry.}
+\label{fig:circle}
+\end{center}
+\end{figure}
+
+
+There are two shortcomings of the block geometry method.  First, it is zeroth-order accurate for curvilinear geometries \cite{Fadlun:temp}.
+In other words, as the grid is refined---even after laborious reconstruction of the block geometry---we never recover the exact solution.  Second, creation of even simple geometries can be tedious. For example, users will go to incredible lengths to carve out rounded tunnels for circular ducts, a task that is fairly simple for most unstructured codes (not that the meshes tend to be much better!).
+
+In direct forcing IBM, the force term in the momentum equation is set to drive a specific velocity component to a desired value.  In the block geometry approach (Fig.~\ref{fig:circle}, right), the impermeability condition is enforced by setting the normal component of velocity to zero on the solid surface. But as shown by Fadlun \cite{Fadlun:temp}, it is relatively simple to obtain a second-order solution for the velocity field: the velocity component is found from a linear interpolation between the velocity of the solid surface (no slip, impermeability) and a value at some distance normal to the surface.  This is illustrated on the left in Fig.~\ref{fig:circle}.  Away from the surface the staggered $u$ velocity components are interpolated to the point marked by the solid dot, which is twice the normal distance from the surface as the nearest velocity component.
+
+More elaborate schemes exist to obtain the velocity near the surface \cite{Balaras:temp,Choi:temp,McDermott:temp}.  But the emphasis here is on the implementation of a scheme to transport heat and mass near thin obstructions (an issue yet to be addressed in the literature).  Therefore, Fadlun's simple interpolation method is sufficient for momentum.   In 2D, complex surfaces are constructed from a series of connected line segments. In 3D, surfaces are constructed from triangular facets.  Our goal is to minimize numerical diffusion across thin obstructions arbitrarily oriented relative to the Cartesian mesh.  The cause of this diffusion is discussed in more detail below.
+
+In the following sections, we first discuss the linked-list data structure used to connect the surface elements to the grid, similar to the wall cell type used in the basic FDS scheme.  Next, we illustrate the momentum scheme for both simple and complex flow geometries.  We then discuss the unique issues faced by the FDS flow solver for simulating variable density flows with thin obstructions not aligned with the mesh.  Hopefully, we can develop a scheme that handles these problems!
+
+\subsection{Data Structure}
+
+\subsubsection{Block Geometry}
+
+In the basic FDS method, a wall cell (WC) is one face of a gas phase cell.  A WC derived type stores the indices of the gas phase cell\footnote{Here I am not getting into the difference between wall cell and 1D in-depth derived types.  When I say WC, in most cases I mean precisely {\ct WC\%ONE\_D}.}.  It also stores face values of density, species mass fraction, and temperature, and the wall-normal cell dimension used to construct gradients.  The relevant variables in the code are:
+
+\begin{table}[h!]
+\begin{tabular}{ll}
+{\ct WC\%IIG, WC\%JJG, WC\%KKG} & gas phase cell indices \\
+{\ct WC\%UW}                    & wall-normal velocity component \\
+{\ct WC\%RHO\_F}                & gas phase mass density at the wall \\
+{\ct WC\%ZZ\_F}                 & lumped species mass fraction at the wall \\
+{\ct WC\%TMP\_F}                & temperature at the wall \\
+{\ct WC\%DN}                    & wall-normal cell dimension \\
+{\ct WC\%IOR}                   & orientation from wall to cell center
+\end{tabular}
+\end{table}
+
+The face values serve as Dirichlet boundary conditions.  If Neumann boundary conditions are needed, they are constructed from a one-sided difference.  For example, the temperature gradient at the wall is obtained from
+\begin{equation}
+\frac{\partial T}{\partial n} \approx \frac{T_g - T_f}{\delta n/2}
+\end{equation}
+
+\subsubsection{Complex Geometry}
+
+
+
+
+
+
+\section{Verification Tests}
+
 This section describes some of the test cases used to verify that FDS and Smokeview are computing
 and visualizing unstructured geometric objects correctly.  This section will be used as source material for adding
 more details to the various guides on how to setup unstructured geometries for use with FDS. (i.e. this section
 is not intended to be included verbatim in the FDS User Guide).
 
-\newcommand{\geominput}[1]{{\scriptsize\verbatiminput{../../Verification/Immersed_Boundary_Method/#1}}}
 \newcommand{\figheightD}{2.75in}
 
 \subsection{geom\_simple.fds}
@@ -806,14 +1075,14 @@ the size and location of the sphere.  This discretization technique results in e
 \begin{figure}
 \begin{center}
 \begin{tabular}{cc}
- \includegraphics[width=2.1in]{SCRIPT_FIGURES/geom_sphere1a}&
- \includegraphics[width=2.1in]{SCRIPT_FIGURES/geom_sphere1b}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere1a}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere1b}\\
  LEVEL=0&LEVEL=1\\
- \includegraphics[width=2.1in]{SCRIPT_FIGURES/geom_sphere1c}&
- \includegraphics[width=2.1in]{SCRIPT_FIGURES/geom_sphere1d}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere1c}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere1d}\\
  LEVEL=2&LEVEL=3\\
- \includegraphics[width=2.1in]{SCRIPT_FIGURES/geom_sphere1e}&
- \includegraphics[width=2.1in]{SCRIPT_FIGURES/geom_sphere1f}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere1e}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere1f}\\
  LEVEL=4&LEVEL=5\\
   \end{tabular}
 \end{center}
@@ -828,14 +1097,14 @@ to split a sphere in latitudinal (north/south) and longitudinal (east/west) dire
 \begin{figure}
 \begin{center}
 \begin{tabular}{cc}
- \includegraphics[width=2.3in]{SCRIPT_FIGURES/geom_sphere3a}&
- \includegraphics[width=2.3in]{SCRIPT_FIGURES/geom_sphere3b}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere3a}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere3b}\\
  N\_LAT=3,N\_LONG=6&N\_LAT=6,N\_LONG=12\\
- \includegraphics[width=2.3in]{SCRIPT_FIGURES/geom_sphere3c}&
- \includegraphics[width=2.3in]{SCRIPT_FIGURES/geom_sphere3d}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere3c}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere3d}\\
  N\_LAT=12,N\_LONG=24&N\_LAT=24,N\_LONG=48\\
- \includegraphics[width=2.3in]{SCRIPT_FIGURES/geom_sphere3e}&
- \includegraphics[width=2.3in]{SCRIPT_FIGURES/geom_sphere3f}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere3e}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_sphere3f}\\
  N\_LAT=48,N\_LONG=96&N\_LAT=96,N\_LONG=192\\
   \end{tabular}
 \end{center}
@@ -940,10 +1209,10 @@ is applied to the object using spherical coordinates.
 \begin{figure}
 \begin{center}
 \begin{tabular}{cc}
- \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_texture3a}&
- \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_texture3b}\\
- \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_texture4a}&
- \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_texture4b}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_texture3a}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_texture3b}\\
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_texture4a}&
+ \includegraphics[width=3.5in]{SCRIPT_FIGURES/geom_texture4b}\\
  lat/long discretization&recursive discretization
   \end{tabular}
 \end{center}
@@ -967,151 +1236,151 @@ Figure \ref{fig:geom_arch} was created using VERTS and FACES keywords.
 \label{fig:geom_arch}
 \end{figure}
 
-\subsection{geom\_time.fds}
-Figure \ref{fig:geom_time} was created using the following \&GEOM namelist.
-The {\ct AZIM}\ keyword is used to specify the initial rotational angle
-and the {\ct AXIM\_DOT}\ is used to specify that rate at which
-the azimuthal angle changes, in this  case 0.36 deg/s.
+%\subsection{geom\_time.fds}
+%Figure \ref{fig:geom_time} was created using the following \&GEOM namelist.
+%The {\ct AZIM}\ keyword is used to specify the initial rotational angle
+%and the {\ct AXIM\_DOT}\ is used to specify that rate at which
+%the azimuthal angle changes, in this  case 0.36 deg/s.
+%
+%{\small
+%\begin{verbatim}
+%&GEOM ID='geom4',
+%      VERTS=0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,
+%      FACES=1,2,3,AZIM=0.0,AZIM_DOT=0.36,SURF_ID='surf1'/
+%\end{verbatim}
+%}
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tabular}{ccc}
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time_050}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time_100}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time_150}\\
+% \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
+%  \end{tabular}
+%\end{center}
+% \caption{A triangle rotating about the scene center. Case: geom\_time.fds}
+%\label{fig:geom_time}
+%\end{figure}
+%
+%\subsection{geom\_time2.fds, geom\_time3.fds, geom\_time4.fds}
+%Figure \ref{fig:geom_time2} was created using the following \&GEOM namelists.
+%The {\ct AZIM}\ keyword is used to specify the initial rotational angle
+%and the {\ct AXIM\_DOT}\ is used to specify that rate at which
+%the azimuthal angle changes, in this  case 0.72 deg/s.
+%The {\ct blade}\ object is used as components to create four blade objects
+%{\ct blade1}, {\ct blade2}, {\ct blade3} and {\ct blade4} of the
+%{\ct prop}\  object. The blades are positioned within the {\ct prop} using the {\ct DAZIM}\ keyword. Figures \ref{fig:geom_time3} and \ref{fig:geom_time4} were created similarly using rotation keywords to incline the geometric objects.
+%
+%{\small
+%\begin{verbatim}
+%&GEOM ID='blade',AZIM=0.0,AZIM_DOT=0.72
+%VERTS=0.0,0.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,
+%FACES=1,2,3,COMPONENT_ONLY=.TRUE.,SURF_ID='surf4'/
+%
+%&GEOM ID='blade1',GEOM_IDS(1)='blade',SURF_ID='surf1',COMPONENT_ONLY=.TRUE. /
+%&GEOM ID='blade2',GEOM_IDS(1)='blade',SURF_ID='surf2',COMPONENT_ONLY=.TRUE. /
+%&GEOM ID='blade3',GEOM_IDS(1)='blade',SURF_ID='surf3',COMPONENT_ONLY=.TRUE. /
+%&GEOM ID='prop' GEOM_IDS(1)='blade1',DAZIM(1)=0.0,
+%GEOM_IDS(2)='blade2',DAZIM(2)=90.0,
+%GEOM_IDS(3)='blade1',DAZIM(3)=180.0,
+%GEOM_IDS(4)='blade3',DAZIM(4)=270.0,
+%\end{verbatim}
+%}
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tabular}{ccc}
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time2_050}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time2_100}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time2_150}\\
+% \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
+%  \end{tabular}
+%\end{center}
+% \caption{Four triangles defined as a group rotating about the scene center. A Case: geom\_time2.fds}
+%\label{fig:geom_time2}
+%\end{figure}
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tabular}{ccc}
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time3_050}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time3_100}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time3_150}\\
+% \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
+%  \end{tabular}
+%\end{center}
+% \caption{Four inclined triangles defined as a group rotating and about the scene center. A Case: geom\_time3.fds}
+%\label{fig:geom_time3}
+%\end{figure}
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tabular}{ccc}
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time4_050}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time4_100}&
+% \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time4_150}\\
+% \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
+%  \end{tabular}
+%\end{center}
+% \caption{Two sets of four triangles rotating about the scene center. Each set of 4 triangles are defined as a group. Case: geom\_time4.fds}
+%\label{fig:geom_time4}
+%\end{figure}
 
-{\small
-\begin{verbatim}
-&GEOM ID='geom4',
-      VERTS=0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,
-      FACES=1,2,3,AZIM=0.0,AZIM_DOT=0.36,SURF_ID='surf1'/
-\end{verbatim}
-}
+%\subsection{geom\_slice.fds}
+%The slice file in Figure \ref{fig:geom_slice} was generated using the {\tt SLICETYPE}\ keyword on a {\tt \&SLCF}\ namelist statement as in
+%{\footnotesize
+%\begin{verbatim}
+%&SLCF PBY=0.75,QUANTITY='TEMPERATURE',CELL_CENTERED=.TRUE., SLICETYPE='EXCLUDEGEOM' /.
+%\end{verbatim}
+%}
+%
+%\noindent The {\tt SLICETYPE}\ keyword is used to specify the type of slice generated.  For example, a slice consisting of only cutcells, a slice  including the effects of immersed geometry, a slice ignoring immersed geometry and a slice output using the original slice file format.  These choices are documented in Table \ref{table:slicetype}.
+%
+%\begin{table}
+%\caption{Description of {\tt SLICETYPE}\ values used on a {\tt \&SLCF}\ namelist statement }
+%\begin{tabular}{|l|l|}
+%  \hline
+%Keyword& Description\\
+%\hline
+%STRUCTURED&generate slice using original  file format\\
+%CUTCELL&output only triangle faces associated with  cutcells\\
+%INCLUDEGEOM&include immersed geometry when generating a slice file\\
+%EXCLUDEGEOM&ignore immersed geometry when generating a slice file\\
+%\hline
+%\end{tabular}
+%\label{table:slicetype}
+%\end{table}
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tabular}{cc}
+% \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_slice_slice_000}&
+% \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_slice_slice_020}\\
+% \SI{0.0}{s}&\SI{20.0}{s}
+%  \end{tabular}
+%\end{center}
+% \caption{Slice file generated using the geometry file format Case: geom\_slice.fds.  The two triangles are an immersed object with boundary file temperature data displayed on its surface.}
+%\label{fig:geom_slice}
+%\end{figure}
 
-\begin{figure}
-\begin{center}
-\begin{tabular}{ccc}
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time_050}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time_100}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time_150}\\
- \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
-  \end{tabular}
-\end{center}
- \caption{A triangle rotating about the scene center. Case: geom\_time.fds}
-\label{fig:geom_time}
-\end{figure}
-
-\subsection{geom\_time2.fds, geom\_time3.fds, geom\_time4.fds}
-Figure \ref{fig:geom_time2} was created using the following \&GEOM namelists.
-The {\ct AZIM}\ keyword is used to specify the initial rotational angle
-and the {\ct AXIM\_DOT}\ is used to specify that rate at which
-the azimuthal angle changes, in this  case 0.72 deg/s.
-The {\ct blade}\ object is used as components to create four blade objects
-{\ct blade1}, {\ct blade2}, {\ct blade3} and {\ct blade4} of the
-{\ct prop}\  object. The blades are positioned within the {\ct prop} using the {\ct DAZIM}\ keyword. Figures \ref{fig:geom_time3} and \ref{fig:geom_time4} were created similarly using rotation keywords to incline the geometric objects.
-
-{\small
-\begin{verbatim}
-&GEOM ID='blade',AZIM=0.0,AZIM_DOT=0.72
-VERTS=0.0,0.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,
-FACES=1,2,3,COMPONENT_ONLY=.TRUE.,SURF_ID='surf4'/
-
-&GEOM ID='blade1',GEOM_IDS(1)='blade',SURF_ID='surf1',COMPONENT_ONLY=.TRUE. /
-&GEOM ID='blade2',GEOM_IDS(1)='blade',SURF_ID='surf2',COMPONENT_ONLY=.TRUE. /
-&GEOM ID='blade3',GEOM_IDS(1)='blade',SURF_ID='surf3',COMPONENT_ONLY=.TRUE. /
-&GEOM ID='prop' GEOM_IDS(1)='blade1',DAZIM(1)=0.0,
-GEOM_IDS(2)='blade2',DAZIM(2)=90.0,
-GEOM_IDS(3)='blade1',DAZIM(3)=180.0,
-GEOM_IDS(4)='blade3',DAZIM(4)=270.0,
-\end{verbatim}
-}
-
-\begin{figure}
-\begin{center}
-\begin{tabular}{ccc}
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time2_050}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time2_100}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time2_150}\\
- \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
-  \end{tabular}
-\end{center}
- \caption{Four triangles defined as a group rotating about the scene center. A Case: geom\_time2.fds}
-\label{fig:geom_time2}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-\begin{tabular}{ccc}
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time3_050}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time3_100}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time3_150}\\
- \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
-  \end{tabular}
-\end{center}
- \caption{Four inclined triangles defined as a group rotating and about the scene center. A Case: geom\_time3.fds}
-\label{fig:geom_time3}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-\begin{tabular}{ccc}
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time4_050}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time4_100}&
- \includegraphics[width=2.0in]{SCRIPT_FIGURES/geom_time4_150}\\
- \SI{50.0}{s}&\SI{100.0}{s}&\SI{150.0}{s}
-  \end{tabular}
-\end{center}
- \caption{Two sets of four triangles rotating about the scene center. Each set of 4 triangles are defined as a group. Case: geom\_time4.fds}
-\label{fig:geom_time4}
-\end{figure}
-
-\subsection{geom\_slice.fds}
-The slice file in Figure \ref{fig:geom_slice} was generated using the {\tt SLICETYPE}\ keyword on a {\tt \&SLCF}\ namelist statement as in
-{\footnotesize
-\begin{verbatim}
-&SLCF PBY=0.75,QUANTITY='TEMPERATURE',CELL_CENTERED=.TRUE., SLICETYPE='EXCLUDEGEOM' /.
-\end{verbatim}
-}
-
-\noindent The {\tt SLICETYPE}\ keyword is used to specify the type of slice generated.  For example, a slice consisting of only cutcells, a slice  including the effects of immersed geometry, a slice ignoring immersed geometry and a slice output using the original slice file format.  These choices are documented in Table \ref{table:slicetype}.
-
-\begin{table}
-\caption{Description of {\tt SLICETYPE}\ values used on a {\tt \&SLCF}\ namelist statement }
-\begin{tabular}{|l|l|}
-  \hline
-Keyword& Description\\
-\hline
-STRUCTURED&generate slice using original  file format\\
-CUTCELL&output only triangle faces associated with  cutcells\\
-INCLUDEGEOM&include immersed geometry when generating a slice file\\
-EXCLUDEGEOM&ignore immersed geometry when generating a slice file\\
-\hline
-\end{tabular}
-\label{table:slicetype}
-\end{table}
-
-\begin{figure}
-\begin{center}
-\begin{tabular}{cc}
- \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_slice_slice_000}&
- \includegraphics[width=3.0in]{SCRIPT_FIGURES/geom_slice_slice_020}\\
- \SI{0.0}{s}&\SI{20.0}{s}
-  \end{tabular}
-\end{center}
- \caption{Slice file generated using the geometry file format Case: geom\_slice.fds.  The two triangles are an immersed object with boundary file temperature data displayed on its surface.}
-\label{fig:geom_slice}
-\end{figure}
-
-\subsection{geom\_sphere2.fds}
-Figure \ref{fig:geom_sphere2b} tests motion of a scaled,  moving, rotating sphere. The sphere was scaled using {\ct SCALE=0.6,0.4,0.2}\, placed initially at the right side of the domain using {\ct XYZ=10.0,0.5,1.0}, translated to the left and down using {\ct XYZ\_DOT=-0.01,0.0,-0.001} and rotated using {\ct GROTATE\_DOT=0.36}.  The axis of rotation was specified using {\ct GAXIS=0.0,1.0,0.0}.
-
-\begin{figure}
-\begin{center}
-\begin{tabular}{c}
-\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_000}\\
-\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_200}\\
-\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_400}\\
-\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_600}\\
-\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_800}\\
-\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_1000}
-  \end{tabular}
-\end{center}
- \caption{Motion of a scaled, moving, rotating sphere.  Case: geom\_sphere2.fds}
-\label{fig:geom_sphere2b}
-\end{figure}
+%\subsection{geom\_sphere2.fds}
+%Figure \ref{fig:geom_sphere2b} tests motion of a scaled,  moving, rotating sphere. The sphere was scaled using {\ct SCALE=0.6,0.4,0.2}\, placed initially at the right side of the domain using {\ct XYZ=10.0,0.5,1.0}, translated to the left and down using {\ct XYZ\_DOT=-0.01,0.0,-0.001} and rotated using {\ct GROTATE\_DOT=0.36}.  The axis of rotation was specified using {\ct GAXIS=0.0,1.0,0.0}.
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tabular}{c}
+%\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_000}\\
+%\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_200}\\
+%\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_400}\\
+%\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_600}\\
+%\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_800}\\
+%\includegraphics[width=6.0in]{SCRIPT_FIGURES/geom_sphere2_1000}
+%  \end{tabular}
+%\end{center}
+% \caption{Motion of a scaled, moving, rotating sphere.  Case: geom\_sphere2.fds}
+%\label{fig:geom_sphere2b}
+%\end{figure}
 
 %\subsection{geom\_sphere\_fire.fds}
 %Figure \ref{fig:geom_sphere_fire} tests visualization of a boundary file data on a sphere.
@@ -1154,629 +1423,246 @@ Figure \ref{fig:geom_sphere2b} tests motion of a scaled,  moving, rotating spher
 %\label{fig:geom_sphere2_fire}
 %\end{figure}
 
-\clearpage
 
-\section{Cutcell Immersed Boundary Method (CIBM)}
+\subsection{Cut-cell definition around immersed cone: split cells, piercing and alignment}
 
-\paragraph{Abstract} In this chapter, we discuss implementation of a hybrid cutcell direct-forcing immersed boundary method (CIBM) to handle complex geometry in the Fire Dynamics Simulator (FDS).  Particular attention is paid to the challenges associated with thin (zero thickness) obstructions in variable density flows with heat and mass transfer.  The triangular facet is chosen as the basic element for construction of complex geometry.  Reasons behind this choice are discussed.  A linked-list data structure for the facets is presented.  One-sided differencing and methods for overcoming numerical diffusion issues are discussed.  Verification cases for momentum, heat, and mass transport are presented.
 
-\subsection{Introduction}
+\subsection{Cut-cell definition around sphere: serial performance and parallel scaling}
 
-The Fire Dynamics Simulator (FDS) has always used a simple direct forcing immersed boundary method (IBM) to handle flow obstructions.  Generally, obstructions are restricted to conform to the underlying Cartesian mesh, leading to stair-step approximations to curvilinear geometries (see Fig.~\ref{fig:circle}).
 
-\begin{figure}
-\begin{center}
-\begin{tabular}{cc}
-\begin{tikzpicture}
-\draw[line width=1mm,fill=lightgray] (1.8,1.8) circle [radius=1.5];
-\draw[help lines] (0,0) grid (5,5);
-\draw[ultra thick,->] (2.66,4.5) -- (3.33,4.5);
-\draw[ultra thick,->] (2.66,3.5) -- (3.33,3.5);
-\draw[ultra thick,->] (3.66,4.5) -- (4.33,4.5);
-\draw[ultra thick,->] (3.66,3.5) -- (4.33,3.5);
-\draw[thick] (2.665,3.0255) -- (3.335,3.9745);
-\draw[fill] (3.335,3.9745) circle [radius=0.1];
-\end{tikzpicture}
-\hspace{1cm}&\hspace{1cm}
-\begin{tikzpicture}
-\draw[line width=1mm,fill=lightgray] (1,0) to (1,1) to (0,1) to (0,2) to (1,2) to (1,3) to (3,3) to (3,1) to (2,1) to (2,0) to (.95,0);
-\draw[help lines] (0,0) grid (5,5);
-\end{tikzpicture}
-\end{tabular}
-\caption{(Left) Desired geometry (circle). (Right) FDS representation---a cell is solid if more than half its volume is occupied by the desired geometry.}
-\label{fig:circle}
-\end{center}
+\subsection{Explicit-implicit time integration for scalar transport}
+
+
+\subsubsection{Temporal Error analysis for variable density projection}
+
+\label{sec:saad_cc_temporal_error}
+
+This case is a variation of problem \ref{sec:saad_temporal_error} for a domain that includes an imposed cut-cell region, where the cut-cells have same geometry as regular cells. The problem allows us to verify the temporal accuracy of our scalar transport implementation for cut-cells. The problem is defined by the advection of a non-reacting mixture of two fluids with different densities (10:1 ratio) in one cartesian direction. Zero diffusivity is prescribed. For the problem definition and temporal error computation details, we refer the reader to problem \ref{sec:saad_temporal_error}.
+The domain is defined by a mesh containing $N_x=512$ cells in the $x$ direction, where the domain $x=[-1,1]$. Also, four cells are defined in the $y$ direction as required by the FFT Poisson solver. Note that the problem defined is one-dimensional in $x$. 
+On this domain, cut-cells with same shape and size of regular cells are defined in the space $x=[-0.5,0.5]$. The test verifies that the implementation details of this cut-cell region does not affect the temporal order of accuracy seen on the default verification case of section \ref{sec:saad_temporal_error}.
+
+\title{Temporal order of accuracy}
+
+Six cases are defined for this test:
+%
+\begin{enumerate}
+ \item[a]  Three correspond to default FDS DNS flux limiter and default explicit Strong Stability Preserving Runge Kutta (SSPRK2) time integration in cells not covered by cut-cells, plus Godunov flux limiter and explicit SSPRK2 time integration in cut-cell region, for CFL numbers $0.25$, $0.125$, $0.0625$. These cases are defined in {\ct /Complex\_Geometry/saad\_CC\_explicit\_*.fds}. 
+ 
+  \item[b] The other three cases correspond to default flux limiter and time integration in cells not covered by cut-cells, plus Godunov flux limiter and implicit time integration in cut-cell region for the same CFL numbers. The implicit integration on the cut-cell region is done applying an Backward Euler step in the predictor, and Trapezoidal Rule on the corrector step. The imposition of boundary conditions for the implicit region in domain and explicit-implicit (EXIM) boundaries follows the technical notes in section \ref{sec:exim_scalar_transport} of the Technical Reference Guide. These cases are defined in {\ct /Complex\_Geometry/saad\_CC\_implicit\_*.fds}.
+  
+\end{enumerate}
+%
+
+Same procedure as explained in section  \ref{sec:saad_temporal_error} is used to define the temporal order of accuracy $p$. As noted there, this procedure filters out the spatial error from the computed temporal convergence. Initial and final fields for temperature and mixture fraction for the smallest integration time step are shown in the top figures of Fig.~\ref{fig:saad_cc_temporal_order}. Fields advect to the right with unitary velocity. The two bottom figures show the order $p$ computed point wise in the $x$ direction for explicit and implicit time integration on the cut-cell region. Deviations from $p \simeq 2$ are dependent on the formula used to compute $p$, as explained in section~\ref{sec:saad_temporal_error}. 
+The $l_2$ norm of $p$ computed pointwise for explicit integration in cut-cells is \input{../FDS_Verification_Guide/SCRIPT_FIGURES/saad_CC_explicit_l2_norm}\!, and for implicit time integration of scalars on these is  \input{../FDS_Verification_Guide/SCRIPT_FIGURES/saad_CC_implicit_l2_norm}\!. 
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=.49\textwidth]{../FDS_Verification_Guide/SCRIPT_FIGURES/saad_CC_explicit_Z.pdf}
+\includegraphics[width=.49\textwidth]{../FDS_Verification_Guide/SCRIPT_FIGURES/saad_CC_explicit_rho.pdf}
+\includegraphics[width=.49\textwidth]{../FDS_Verification_Guide/SCRIPT_FIGURES/saad_CC_explicit_temporal_order_rho.pdf}
+\includegraphics[width=.49\textwidth]{../FDS_Verification_Guide/SCRIPT_FIGURES/saad_CC_implicit_temporal_order_rho.pdf}
+\caption[The {\ct saad CC} temporal order test case]{Temporal order for a variable-density projection on domain including cut-cell region.  (Upper-left) Initial and final field for mixture fraction, explicit time integration on cut-cells.  (Upper-right) Initial and final field for density, explicit time integration on cut-cells.  (Lower-left) $p$ computed pointwise for density at final time, explicit integration on cut-cells. (Lower-right) $p$ computed pointwise for density at final time, implicit time integration on cut-cells.  Fluctuations are due to degenerate points in the formula for $p$.}\label{fig:saad_cc_temporal_order}
 \end{figure}
 
 
-There are two shortcomings of the block geometry method.  First, it is zeroth-order accurate for curvilinear geometries \cite{Fadlun:temp}.
-In other words, as the grid is refined---even after laborious reconstruction of the block geometry---we never recover the exact solution.  Second, creation of even simple geometries can be tedious. For example, users will go to incredible lengths to carve out rounded tunnels for circular ducts, a task that is fairly simple for most unstructured codes (not that the meshes tend to be much better!).
-
-In direct forcing IBM, the force term in the momentum equation is set to drive a specific velocity component to a desired value.  In the block geometry approach (Fig.~\ref{fig:circle}, right), the impermeability condition is enforced by setting the normal component of velocity to zero on the solid surface. But as shown by Fadlun \cite{Fadlun:temp}, it is relatively simple to obtain a second-order solution for the velocity field: the velocity component is found from a linear interpolation between the velocity of the solid surface (no slip, impermeability) and a value at some distance normal to the surface.  This is illustrated on the left in Fig.~\ref{fig:circle}.  Away from the surface the staggered $u$ velocity components are interpolated to the point marked by the solid dot, which is twice the normal distance from the surface as the nearest velocity component.
-
-More elaborate schemes exist to obtain the velocity near the surface \cite{Balaras:temp,Choi:temp,McDermott:temp}.  But the emphasis here is on the implementation of a scheme to transport heat and mass near thin obstructions (an issue yet to be addressed in the literature).  Therefore, Fadlun's simple interpolation method is sufficient for momentum.   In 2D, complex surfaces are constructed from a series of connected line segments. In 3D, surfaces are constructed from triangular facets.  Our goal is to minimize numerical diffusion across thin obstructions arbitrarily oriented relative to the Cartesian mesh.  The cause of this diffusion is discussed in more detail below.
-
-In the following sections, we first discuss the linked-list data structure used to connect the surface elements to the grid, similar to the wall cell type used in the basic FDS scheme.  Next, we illustrate the momentum scheme for both simple and complex flow geometries.  We then discuss the unique issues faced by the FDS flow solver for simulating variable density flows with thin obstructions not aligned with the mesh.  Hopefully, we can develop a scheme that handles these problems!
-
-\subsection{Data Structure}
-
-\subsubsection{Block Geometry}
-
-In the basic FDS method, a wall cell (WC) is one face of a gas phase cell.  A WC derived type stores the indices of the gas phase cell\footnote{Here I am not getting into the difference between wall cell and 1D in-depth derived types.  When I say WC, in most cases I mean precisely {\ct WC\%ONE\_D}.}.  It also stores face values of density, species mass fraction, and temperature, and the wall-normal cell dimension used to construct gradients.  The relevant variables in the code are:
-
-\begin{table}[h!]
-\begin{tabular}{ll}
-{\ct WC\%IIG, WC\%JJG, WC\%KKG} & gas phase cell indices \\
-{\ct WC\%UW}                    & wall-normal velocity component \\
-{\ct WC\%RHO\_F}                & gas phase mass density at the wall \\
-{\ct WC\%ZZ\_F}                 & lumped species mass fraction at the wall \\
-{\ct WC\%TMP\_F}                & temperature at the wall \\
-{\ct WC\%DN}                    & wall-normal cell dimension \\
-{\ct WC\%IOR}                   & orientation from wall to cell center
-\end{tabular}
-\end{table}
-
-The face values serve as Dirichlet boundary conditions.  If Neumann boundary conditions are needed, they are constructed from a one-sided difference.  For example, the temperature gradient at the wall is obtained from
-\begin{equation}
-\frac{\partial T}{\partial n} \approx \frac{T_g - T_f}{\delta n/2}
-\end{equation}
-
-\subsubsection{Complex Geometry}
-
-As we move toward complex shapes immersed within the Cartesian mesh, to the extent possible we have tried to maintain a correspondence with the WC data type.  The analog in the new approach is, in 3D, a triangular facet, FC. This choice was made for the following reasons:
-\begin{enumerate}[{\,\,\,\,(}a{)}]
-\item For simplicity, we wanted to restrict ourselves to one generic element type.
-\item Curvilinear surfaces can be approximated to second-order accuracy with linear elements.
-\item Three points are unambiguously planar.
-\item Algorithms for triangle/box intersection are readily available.
-\end{enumerate}
-
-Note that a basic WC face must be constructed from two FC faces (see Fig.~\ref{fig:facetcell}), thus doubling computational effort for the same resolution.  The FC approach makes up for this deficiency with the following benefits:
-\begin{enumerate}[{(}i{)}]
-\item We have the flexibility to create arbitrarily complex shapes.
-\item The resolution of the solid surface need not be the same as the gas phase.  When coarser resolution is permissible, we achieve a cost savings.
-\end{enumerate}
-
-%The first item may be obvious, but the second deserves elaboration. For many objects in the scenario, the boundary conditions may not change much or may not be important enough to finely resolve.  Suppose there is a door that is only partially open (say 45$^\circ$ angle) and the gas phase resolution within the room is 10 cm.  A standard doorway in the U.S. is 91 cm by 203 cm.  Therefore, resolving each gas phase cell with a wall cell on the door would require roughly $9 \times 20 \times 2 = 360$ facets.  But if detailed resolution of the door is unnecessary, we can get away with only 2 facets (see Fig.~\ref{fig:opendoor}).
-
-\begin{figure}
-\begin{center}
-\begin{tikzpicture}
-
-\draw (0,0)--(0,3);
-\draw (0,3)--(3,3);
-\draw (3,3)--(3,0);
-\draw (3,0)--(0,0);
-
-\draw (1,4)--(4,4);
-\draw (4,4)--(4,1);
-
-\draw (0,3)--(1,4);
-\draw (3,3)--(4,4);
-\draw (3,0)--(4,1);
-
-\draw (0,0)--(3,3);
-\draw (3,3)--(4,1);
-\draw (1,4)--(3,3);
-
-\end{tikzpicture}
-
-\caption{Triangular facets covering a cubic cell.  Two facets are needed for each face, as opposed to one wall cell.}
-\label{fig:facetcell}
-\end{center}
-\end{figure}
+\subsubsection{Variable-Density manufactured solution}
 
 
+
+
+
+
+\subsection{Immersed boundary method on manufactured solution around rotated cube}
+
+
+
+
+
+\subsection{Conservation test of isothermal helium plume around sphere}
+
+
+
+
+
+\subsection{Parallel consistency test of helium plume around sphere, 1 mesh vs. 3 meshes}
+
+
+
+
+\subsection{Consistency test for OBST and GEOM of flow around heated cubes}
+
+
+
+
+%\subsection{Flow around heated curved pipe or something like that}
+
+
+
+
+\section{Validation Tests}
+
+\subsection{Vettori fire on sloped ceiling compartment experiments}
+
+
+
+
+
+\subsection{Lattimer flow around inclined wall experiments}
+
+
+
+
+
+\subsection{Askervein Hill}
+
+
+
+
+
+
+
+%As we move toward complex shapes immersed within the Cartesian mesh, to the extent possible we have tried to maintain a correspondence with the WC data type.  The analog in the new approach is, in 3D, a triangular facet, FC. This choice was made for the following reasons:
+%\begin{enumerate}[{\,\,\,\,(}a{)}]
+%\item For simplicity, we wanted to restrict ourselves to one generic element type.
+%\item Curvilinear surfaces can be approximated to second-order accuracy with linear elements.
+%\item Three points are unambiguously planar.
+%\item Algorithms for triangle/box intersection are readily available.
+%\end{enumerate}
+%
+%Note that a basic WC face must be constructed from two FC faces (see Fig.~\ref{fig:facetcell}), thus doubling computational effort for the same resolution.  The FC approach makes up for this deficiency with the following benefits:
+%\begin{enumerate}[{(}i{)}]
+%\item We have the flexibility to create arbitrarily complex shapes.
+%\item The resolution of the solid surface need not be the same as the gas phase.  When coarser resolution is permissible, we achieve a cost savings.
+%\end{enumerate}
+%
+%%The first item may be obvious, but the second deserves elaboration. For many objects in the scenario, the boundary conditions may not change much or may not be important enough to finely resolve.  Suppose there is a door that is only partially open (say 45$^\circ$ angle) and the gas phase resolution within the room is 10 cm.  A standard doorway in the U.S. is 91 cm by 203 cm.  Therefore, resolving each gas phase cell with a wall cell on the door would require roughly $9 \times 20 \times 2 = 360$ facets.  But if detailed resolution of the door is unnecessary, we can get away with only 2 facets (see Fig.~\ref{fig:opendoor}).
+%
 %\begin{figure}
 %\begin{center}
-%\begin{tikzpicture}[scale=0.75]
+%\begin{tikzpicture}
 %
-%\draw (0,6) -- (2,8);
-%\draw (0,0) -- (2,2);
+%\draw (0,0)--(0,3);
+%\draw (0,3)--(3,3);
+%\draw (3,3)--(3,0);
+%\draw (3,0)--(0,0);
 %
-%\draw (12,6) -- (10,8);
-%\draw (12,0) -- (10,2);
+%\draw (1,4)--(4,4);
+%\draw (4,4)--(4,1);
 %
-%\draw (2,8) -- (10,8);
-%\draw (2,8) -- (2,2);
-%\draw (10,8) -- (10,2);
+%\draw (0,3)--(1,4);
+%\draw (3,3)--(4,4);
+%\draw (3,0)--(4,1);
 %
-%\draw (4,6.5) -- (6.5,6.5);
-%\draw (4,2) -- (4,6.5);
-%\draw (2,2) -- (4,2);
-%\draw (6.5,2) -- (10,2);
-%
-%\draw (0,0) -- (0,6);
-%\draw (12,0) -- (12,6);
-%\draw (0,0) -- (12,0);
-%
-%\draw[help lines] (1.499,1.499) grid [step=.25cm] (10.5,7.5);
-%
-%\draw[help lines,fill=white] (5,1) to (5,5.5) to (6.5,2) to (5,1);
-%\draw[help lines,fill=white] (6.5,6.5) to (5,5.5) to (6.5,2) to (6.5,6.5);
-%
-%\draw (6.5,2) -- (6.5,6.5);
-%\draw (6.5,6.5) -- (5,5.5);
-%\draw (6.5,2) -- (5,1);
-%\draw (5,1) -- (5,5.5);
-%\draw (5,5.5) -- (6.5,2);
-%
-%\draw[help lines] (5.7499,1.5) grid [step=.25cm] (7.5,7.5);
+%\draw (0,0)--(3,3);
+%\draw (3,3)--(4,1);
+%\draw (1,4)--(3,3);
 %
 %\end{tikzpicture}
 %
-%\caption{Partially open door composed of two facets, illustrating that the solid resolution may be coarser than the gas phase resolution.}
-%\label{fig:opendoor}
+%\caption{Triangular facets covering a cubic cell.  Two facets are needed for each face, as opposed to one wall cell.}
+%\label{fig:facetcell}
 %\end{center}
 %\end{figure}
-
-
-\subsection{Momentum}
-\label{sec:momentum}
-
-Consider the following semi-implicit (fractional step) update for the $i$th component of momentum:
-\begin{equation}
-\label{eqn:mom}
-\frac{u_i^{n+1} - u_i^n}{\delta t} = -\left(F_i^n + \frac{\delta H^{n+1}}{\delta x_i}\right)
-\end{equation}
-This is a fractional step method because a Poisson equation is solved to obtain the pressure term, $H$ (not discussed here). In a direct-forcing immersed boundary method, the force term is replaced by
-\begin{equation}
-\label{eqn:force}
-F_i^* = - \left( \frac{u_i^{ibm} - u_i^n}{\delta t} + \frac{\delta H^*}{\delta x_i}\right)
-\end{equation}
-which drives the velocity component $u_i^{n+1}$ toward $u_i^{ibm}$.  The superscript asterisk indicates that the initial guess for the pressure term is taken from the previous time step.  The update may be iterated to drive the error between $u_i^{n+1}$ and $u_i^{ibm}$ to a desired tolerance.  Note, however, that when this approach is embedded in a second-order predictor-corrector scheme the error in most cases is remarkably small when $H^n$ is used in the force term (no iteration).
-
-\subsubsection{Block Geometry}
-
-For the basic block geometry method used in FDS, the impermeability condition at a surface is enforced by setting $u_i^{ibm} = 0$. If mass transfer is present the surface-normal IBM velocity component is set to $u_i^{ibm} = u_n$, where $u_n$ is the wall-normal component of velocity satisfying the scalar transport equation.  Note that $u_n$ is stored as {\ct WC\%UW} in the code.
-
-\subsubsection{Complex Geometry}
-
-For complex geometry the surface usually does not align itself with the face of a Cartesian grid cell. A given velocity component, therefore, is not on a boundary, but must still satisfy the governing equations subject to the prescribed boundary conditions (position and properties of the surface).  The essential task of a direct-forcing immersed boundary method is to set $u_i^{ibm}$ to achieve a stable and accurate numerical solution as well as an adequate representation of the local flow physics (surface stress, pressure gradient, etc.) without the luxury of infinitely high resolution.
-
-In FDS, there are three IBM options for momentum, set by, for example,
-\small
-\begin{verbatim}
-&MISC IMMERSED_BOUNDARY_METHOD=1/ ! options are 0,1,2
-\end{verbatim}
-\normalsize
-Following is a brief description of each option. The basic linear interpolation method of Fadlun \cite{Fadlun:temp} is given by option (1), and will be used for the examples to follow later in this paper. Refer to the diagram in Fig.~\ref{fig:position_definitions} for position definitions.
-
-\paragraph{\ct IMMERSED\_BOUNDARY\_METHOD=0}
-
-The velocity component force term is unaltered if it falls on the positive side of the surface.  Let $\mathbf{x}_{velo}$ denote the location of the velocity component, $\mathbf{v}_i, (i=1,2,3)$ are the vertices of a face, $\mathbf{n} = (\mathbf{v}_2-\mathbf{v}_1) \times (\mathbf{v}_3-\mathbf{v}_1)$ is the face normal, and let $\mathbf{r} \equiv \mathbf{x}_{velo} - \mathbf{v}_1$ (any of the vertices will do); then if $\delta n =\mathbf{r} \cdot \mathbf{n} > 0$ the velocity component is processed as usual; if the dot product is negative the velocity is ``inside'' the obstruction and is set to zero.  This effectively leads to a zeroth-order (Lego block) representation of the surface.
-
-\paragraph{\ct IMMERSED\_BOUNDARY\_METHOD=1}
-
-The basic linear interpolation scheme of Fadlun starts by identifying a point $\mathbf{x}_{int}$ (see Fig.~\ref{fig:position_definitions}) which is twice the normal distance from the surface as the position of the velocity component, $\mathbf{x}_{velo}$.  The value $u_i(\mathbf{x}_{int}) = u_{i,int}$ is found from a trilinear interpolation of the neighboring staggered velocity component values from the previous time step.  The value of $u_i^{ibm}$ is then taken from a linear interpolation between $u_{i,int}$ and the wall value of the velocity component, $u_{i,w}$ (usually zero).  Thus, $u_i^{ibm} = \frac{1}{2}(u_{i,int} + u_{i,w})$.
-
-\paragraph{\ct IMMERSED\_BOUNDARY\_METHOD=2}
-
-Here the linear profile is replaced by a prescribed wall-normal profile for the mean streamwise velocity.  This requires that we first define a new streamwise coordinate system.  Referring to Fig.~\ref{fig:position_definitions}, let $\mathbf{e}_i, (i=1,2,3)$ define an orthonormal set of basis vectors for our Cartesian grid system and let $\mathbf{\bar{e}}_i, (i=1,2,3)$ define the new streamwise system where $\mathbf{\bar{e}}_1$ is the streamwise direction and $\mathbf{\bar{e}}_3$ is the wall-normal direction.  It is useful to define the new system so that the velocity component in $\mathbf{\bar{e}}_2$ is always zero.  This is achieved as follows: Define a tangent vector $\mathbf{t} \equiv \mathbf{n} \times (\mathbf{u} - \mathbf{u}_w)$ where $\mathbf{u}_w$ is the velocity of the wall (usually zero) and $\mathbf{n}$ is a wall-normal vector. The streamwise basis vector is then found from $\mathbf{\hat{s}} = \mathbf{\hat{t}} \times \mathbf{\hat{n}}$.  The hat represents a unit normal, e.g., $\mathbf{\hat{n}} \equiv \mathbf{n}/|\mathbf{n}|$.  The new streamwise system is then given by $\mathbf{\bar{e}_1}=\mathbf{\hat{s}}$, $\mathbf{\bar{e}_2}=\mathbf{\hat{t}}$, and $\mathbf{\bar{e}_3}=\mathbf{\hat{n}}$. (To conform to the convention used in the atmospheric community, in FDS, the ``vertical'' or surface-normal component is taken as the ``$z$'' component.  Hence, 2D flows are in the $x-z$ plane.)  The elements of the directional cosine matrix are now simply $a_{ij} = \mathbf{e}_i \cdot \mathbf{\bar{e}}_j$.  Velocity vectors may be transformed from the grid system to the streamwise system via $\bar{u}_k = a_{ik} u_i$ and back again via $u_i = a_{ik} \bar{u}_k$ (see, e.g., \cite{Pope:2000} Appendix B).
-
-To evaluate the streamwise profile, all three staggered velocity components are interpolated to $\mathbf{x}_{int}$ and the vector is transformed into the streamwise system.  The streamwise component at $\mathbf{x}_{int}$ is used to define the profile $f(n)$, which is then used to specify the streamwise component at the position of interest ($\mathbf{x}_{velo}$ in the grid system).  Thus, we obtain $\bar{u}_1^{ibm} = f(\delta n)$.  Here note that the bar indicates we are in the streamwise coordinate system.  We need to specify the other two components before we can transform back to the grid system.  As mentioned, the tangential component is zero by construction. Specification of the normal component is currently an active area of research \cite{Choi:2007:temp}.  What complicates matters is that we have two invariants to satisfy: (1) the divergence and (2) the kinetic energy. The kinetic energy is the easier of the two because it does not involve differences.  Still, since all we know from the model is a mean profile, some sort of \emph{ad hoc} assumption must be made.  Given $k_{int}=\frac{1}{2}u_i u_i$ at $\mathbf{x}_{int}$, we use a linear interpolation to determine $k(\delta n) = \frac{1}{2}(k_{int} + k_w)$, where $k_w$ is the kinetic energy at the wall (usually zero).  The magnitude of the normal component is then found from $|\bar{u}_3^{ibm}| = +\sqrt{2k(\delta n) - (\bar{u}_1^{ibm})^2}$.  Finally, the component value of interest is obtained from the transformation $u_i^{ibm} = a_{ik} \bar{u}_k^{ibm}$, where only the $i$th component is retained at the staggered location.
-
-\begin{figure}
-\begin{center}
-\begin{tikzpicture}[scale=1.25]
-
-\draw [fill=lightgray] (0.2,0.5) -- (2.2,3.8) -- (4.5,3.1) -- (0.2,0.5);
-
-\draw[help lines] (-3,-1) grid [step=2cm] (5,7);
-
-\draw (0.30,0.25) node {$\mathbf{v}_1$};
-\draw (4.80,3.10) node {$\mathbf{v}_2$};
-\draw (2.20,4.00) node {$\mathbf{v}_3$};
-
-\draw [->, very thick, >=latex] (-2.5,5.0) -- (-1.5,5.0);
-\draw [->, very thick, >=latex] (-2.5,3.0) -- (-1.5,3.0);
-\draw [->, very thick, >=latex] (-0.5,5.0) -- (0.5,5.0);
-\draw [->, very thick, >=latex] (-0.5,3.0) -- (0.5,3.0);
-\draw (0.5,3.3) node {$\mathbf{x}_{velo}$};
-
-\draw [->, very thick, >=latex] (0.2,0.5) -- (0.0,3.0);
-\draw (-0.15,1.8) node {$\mathbf{r}$};
-
-\draw [->, very thick, >=latex] (0.2,0.5) -- (-1,2.0);
-\draw (-0.5,1.0) node {$\mathbf{n}$};
-
-\draw [->, >=*] (1.1,1.545) -- (-1.3,4.7);
-\draw (-1.5,4.3) node {$\mathbf{x}_{int}$};
-
-\draw [|-] (0.9,1.37) -- (0.57,1.8);
-\draw [-|] (0.24,2.25) -- (-0.19,2.85);
-\draw (.4,2.02) node {$\delta n$};
-
-\draw [->, very thick, >=latex] (1.08,1.55) -- (2.35,1.55);
-\draw [->, very thick, >=latex] (1.1,1.545) -- (0.45,2.4);
-\draw [->, very thick, >=latex] (1.1,1.545) -- (1.75,2.6);
-\draw (2.9,1.55) node {$\mathbf{\hat{s}} \, (\mathbf{\bar{e}}_1)$};
-\draw (1.9,2.60) node {$\mathbf{\hat{t}}$};
-\draw (0.6,2.60) node {$\mathbf{\hat{n}}$};
-
-\draw [->, very thick, >=latex] (-2,0) -- (-2,1);
-\draw [->, very thick, >=latex] (-2,0) -- (-1,0);
-\draw (-0.9,-0.25) node {$\mathbf{e}_1$};
-\draw (-2.35,1) node {$\mathbf{e}_3$};
-
-\draw (1,4.7) .. controls (2.5,2) .. (1.1,1.545);
-\draw [->] (-1.15,4.500) -- (1.10,4.500);
-\draw [->] (-0.58,3.750) -- (1.52,3.750);
-\draw [->] ( 0.20,3.003) -- (1.90,3.003);
-\draw [->] ( 0.54,2.280) -- (2.15,2.280);
-\draw [->] ( 0.90,1.800) -- (1.80,1.800);
-\draw (1.5,5.0) node {$f(n)$};
-
-\end{tikzpicture}
-
-\caption{Position definitions for a single facet.  The function $f(n)$ represents the mean streamwise velocity profile in the wall-normal direction.}
-\label{fig:position_definitions}
-\end{center}
-\end{figure}
-
-\paragraph{Remark} As can be seen, in going from IBM methods 0 to 2 the level of complexity increases significantly.  For the remainder of this paper, we utilize method 1.  The main reason is that our focus here is on the additional complexities that arise with considering heat and mass transfer near infinitely thin obstructions.
-
-%\subsubsection{Convergence of IBM 1}
-%\label{sec:momentum_convergence}
 %
-%In this section we show second-order convergence for IBM 1 by examining the 2D flow near a rotating disk.
-
-\subsection{Heat and Mass Transfer}
-
-This is where the formulation gets tricky.  Both heat and mass transfer present challenges for a typical IBM formulation.  For heat transfer, numerical diffusion from the gas phase domain into the solid domain implies that global energy is not conserved.  For mass transfer, when considering the ``mixed is burnt'' model for combustion chemistry, any numerical diffusion of reactant species across a solid boundary can be fatal to a calculation.  For these reasons, we have chosen to implement a hybrid cutcell immersed boundary method (CIBM), where the cutcells on the immersed boundary surface are treated by an unstructured finite volume solver for heat and mass transport.  This ensures strict conservation of mass and energy in the fluid domain.
-
-\subsubsection{To-Do List}
-
-\begin{enumerate}
-\item Identify cutcells.  Find the Cartesian cells that intersect with solid tet volumes.  To handle zero thickness obstructions we either need the ability to treat facets by themselves or we may allow ``volumes'' with zero volume.  To be discussed.
-\item Compute cutcell (CC) volumes.  Let $V_{cell}$ denote the volume of the Cartesian cell.  Let $V_{tet}$ denote a tetrahedral volume.  The cutcell volume is $V_{cc} = V_{cell} - ( V_{cell} \cap V_{tet} )$.
-\item Merge small cells.  If $V_{cc} < V_{tol}$, merge with a neighboring cell (Cartesian cell or cutcell).  This limits CFL time step restrictions.
-\item Compute surface areas and unit normal vectors for final cutcell volumes.
-\item Interpolate scalars (density, mass fractions, temperature) to CC volume faces (see below).
-\item Interpolate velocity components to CC faces (see below).
-\item Update finite volumes equations (see below).
-\item Construct Cartesian divergence from CC divergence integral (see below).
-\item Update Poisson equation as usual (see FDS Tech Guide).
-\item Reconstruct velocity field to satisfy projection and CC constraints (see below).
-\end{enumerate}
-
-\newpage
-
-\subsubsection{FDS Grid Data Structure}
-
-
-In the following, variables and proposed data lists for cut-cells and faces to be used in the FDS CCIBM code are described. Data structures from the prototype Matlab code and linked list definitions from the current FDS IBM implementation are included for clarity. Names can be changed if there are issues with the existing FDS namespace, etc. Also, we keep it general for now.
-
-
-\subsubsection*{Some type defining and indexing parameters:}
-
-The following parameters are used in defining the type (or status) of cell or cell face on Cartesian grid or solid surfaces: \\
-\texttt{INTEGER, PARAMETER :: GASPHASE     = -1} \\
-\texttt{INTEGER, PARAMETER :: CUTCF         =   0} \\
-\texttt{INTEGER, PARAMETER :: SOLID              =   1} \\
-\texttt{INTEGER, PARAMETER :: INBOUNDARY =   2} \\
-
-
-
-\subsubsection*{New Cartesian grid variables:}
-
-- \textit{Cell-centered} variables for cell-type identification, unknown numbering, etc.:  \\
- \texttt{INTEGER} \texttt{CCVAR(I,J,K,ICVAR)}: Here,  \texttt{ICVAR} can be equal to:   \\
 %
-\begin{itemize}
-
-  \item \texttt{INTEGER, PARAMETER :: IGSC = 1} such that: \\
-           - \texttt{CCVAR(I,J,K,IGSC) == GASPHASE} is a regular \texttt{GASPHASE} cell. \\
-           - \texttt{CCVAR(I,J,K,IGSC) == CUTCF} is a cut-cell, i.e. cell transversed by the solid wet surface. \\
-           - \texttt{CCVAR(I,J,K,IGSC) == SOLID} is a regular cell immersed completely in the solid region.
-
-  \item \texttt{ICVAR} can take other values (2, 3,... to be added later) to map unknowns to \texttt{CUT\_CELL} data, linear systems, etc.
-
-
-\end{itemize}
+%%\begin{figure}
+%%\begin{center}
+%%\begin{tikzpicture}[scale=0.75]
+%%
+%%\draw (0,6) -- (2,8);
+%%\draw (0,0) -- (2,2);
+%%
+%%\draw (12,6) -- (10,8);
+%%\draw (12,0) -- (10,2);
+%%
+%%\draw (2,8) -- (10,8);
+%%\draw (2,8) -- (2,2);
+%%\draw (10,8) -- (10,2);
+%%
+%%\draw (4,6.5) -- (6.5,6.5);
+%%\draw (4,2) -- (4,6.5);
+%%\draw (2,2) -- (4,2);
+%%\draw (6.5,2) -- (10,2);
+%%
+%%\draw (0,0) -- (0,6);
+%%\draw (12,0) -- (12,6);
+%%\draw (0,0) -- (12,0);
+%%
+%%\draw[help lines] (1.499,1.499) grid [step=.25cm] (10.5,7.5);
+%%
+%%\draw[help lines,fill=white] (5,1) to (5,5.5) to (6.5,2) to (5,1);
+%%\draw[help lines,fill=white] (6.5,6.5) to (5,5.5) to (6.5,2) to (6.5,6.5);
+%%
+%%\draw (6.5,2) -- (6.5,6.5);
+%%\draw (6.5,6.5) -- (5,5.5);
+%%\draw (6.5,2) -- (5,1);
+%%\draw (5,1) -- (5,5.5);
+%%\draw (5,5.5) -- (6.5,2);
+%%
+%%\draw[help lines] (5.7499,1.5) grid [step=.25cm] (7.5,7.5);
+%%
+%%\end{tikzpicture}
+%%
+%%\caption{Partially open door composed of two facets, illustrating that the solid resolution may be coarser than the gas phase resolution.}
+%%\label{fig:opendoor}
+%%\end{center}
+%%\end{figure}
 %
-- \textit{Face-centered} variables for face-type identification, generating data necessary for matrix and vector building (face based),  etc.:  \\
-\texttt{INTEGER} \texttt{FCVAR(I,J,K,IFVAR)}: Here,  \texttt{IFVAR} can be equal to:   \\
 %
-\begin{itemize}
-
-  \item \texttt{INTEGER, PARAMETER :: FGSC = 1} such that: \\
-           - \texttt{FCVAR(I,J,K,FGSC) == GASPHASE} is a regular \texttt{GASPHASE} face. \\
-           - \texttt{FCVAR(I,J,K,FGSC) == CUTCF} is a cut-face, i.e. face transversed by the solid wet surface. \\
-           - \texttt{FCVAR(I,J,K,FGSC) == SOLID} is a regular face immersed completely in the solid region.
-
-  \item \texttt{FCVAR} can take other values (2,3,... to be added later) to map face indexes to \texttt{CUT\_FACE} data, etc.
-
-
-\end{itemize}
+%\subsection{Momentum}
+%\label{sec:momentum}
 %
-These variables are defined by mesh, so they can be included as \texttt{ALLOCATABLE} in the \texttt{TYPE\_MESH}, and be allocated if using CCIBM.
-
-
-\subsubsection*{Data structures currently used on the Matlab prototype code:}
-
-- Data structure \texttt{CUT\_FACE}: Contains all \texttt{GASPHASE} and \texttt{INBOUNDARY} cut-faces. The latter are defined in the immersed solid surface and are used to impose boundary conditions for scalars. The total number of cut-faces is \texttt{NCUTFACE}. For a given cut-face \textit{icf}, the data structure has fields:
+%Consider the following semi-implicit (fractional step) update for the $i$th component of momentum:
+%\begin{equation}
+%\label{eqn:mom}
+%\frac{u_i^{n+1} - u_i^n}{\delta t} = -\left(F_i^n + \frac{\delta H^{n+1}}{\delta x_i}\right)
+%\end{equation}
+%This is a fractional step method because a Poisson equation is solved to obtain the pressure term, $H$ (not discussed here). In a direct-forcing immersed boundary method, the force term is replaced by
+%\begin{equation}
+%\label{eqn:force}
+%F_i^* = - \left( \frac{u_i^{ibm} - u_i^n}{\delta t} + \frac{\delta H^*}{\delta x_i}\right)
+%\end{equation}
+%which drives the velocity component $u_i^{n+1}$ toward $u_i^{ibm}$.  The superscript asterisk indicates that the initial guess for the pressure term is taken from the previous time step.  The update may be iterated to drive the error between $u_i^{n+1}$ and $u_i^{ibm}$ to a desired tolerance.  Note, however, that when this approach is embedded in a second-order predictor-corrector scheme the error in most cases is remarkably small when $H^n$ is used in the force term (no iteration).
 %
-\begin{itemize}
-
-  \item  \texttt{CUT\_FACE(icf).XYZVERT}: $x,y,z$ coordinates of cut-face \textit{icf} vertex points. They are composed of intersection points between solid and Cartesian cell faces, and cell or facet vertices. These can be stored on a Global array as discussed with Glenn, and \texttt{XYZVERT} can be replaced by an index vector. They are used to define geometric data and also for plotting purposes (would be used in SMV).
-
-  \item  \texttt{CUT\_FACE(icf).XYZCEN}: $x,y,z$ coordinates of cut-face \textit{icf} area centroid.
-
-  \item  \texttt{CUT\_FACE(icf).STATUS}: can be \texttt{GASPHASE} or \texttt{INBOUNDARY}.
-
-  \item  \texttt{CUT\_FACE(icf).IJK}: If \texttt{CUT\_FACE(icf).STATUS == GASPHASE}, \texttt{ijk} denotes the Cartesian grid \textit{face} the cut-face belongs to. If  \texttt{CUT\_FACE(icf).STATUS == INBOUNDARY},  \texttt{ijk} denotes the Cartesian grid \textit{cell} this cut-face belongs to.
-
-  \item  \texttt{CUT\_FACE(icf).AXIS}: If \texttt{CUT\_FACE(icf).STATUS == GASPHASE}, this face is normal to which axis? \texttt{AXIS} can be \texttt{== IAXIS=1} for x-faces, \texttt{== JAXIS=2} for y-faces and \texttt{== KAXIS=3} for z-faces.  \texttt{CUT\_FACE(icf).STATUS == INBOUNDARY}, then  \texttt{AXIS} is zero.
-
-  \item \texttt{CUT\_FACE(icf).NIJK}: normal unit vector to the cut-face. If \texttt{CUT\_FACE(icf).AXIS == IAXIS} then \texttt{NIJK=[1. 0. 0.]}, if
-  \texttt{CUT\_FACE(icf).AXIS == JAXIS} then \texttt{NIJK=[0. 1. 0.]}, \texttt{CUT\_FACE(icf).AXIS == KAXIS} then  \texttt{NIJK=[0. 0. 1.]}. If \texttt{CUT\_FACE(icf).AXIS == 0},  \texttt{NIJK} is the normal outside of the body for that \texttt{INBOUNDARY} cut-face.
-
-  \item \texttt{CUT\_FACE(icf).BCTYPE(1:NSCALARS)}: boundary condition type, integer that for \texttt{INBOUNDARY} cut-faces, specifies the type of boundary condition imposed for scalars (i.e. constant mass flux, wall, etc.).
-
-  \item \texttt{CUT\_FACE(icf).BCVAL(1:NSCALARS)}: mean boundary condition value assigned for this \texttt{INBOUNDARY} cut-face, for each scalar.
-
-\end{itemize}
+%\subsubsection{Block Geometry}
 %
-Some of the data here is redundant and won't need to be filled up. Now, as in this construct cut faces can be either \texttt{GASPHASE} or \texttt{INBOUNDARY}, we might want to separate these in two structs (i.e. CUT\_FACE\_GP and CUT\_FACE\_BD) to avoid conditionals on cut-face loops.
-
-
-- Data structure \texttt{CUT\_CELL}: Contains all \texttt{GASPHASE} cut-cells. The total number of cut-cells is \texttt{NCUTCELL}. For a given cut-cell \textit{icc}, the data structure has fields:
+%For the basic block geometry method used in FDS, the impermeability condition at a surface is enforced by setting $u_i^{ibm} = 0$. If mass transfer is present the surface-normal IBM velocity component is set to $u_i^{ibm} = u_n$, where $u_n$ is the wall-normal component of velocity satisfying the scalar transport equation.  Note that $u_n$ is stored as {\ct WC\%UW} in the code.
 %
-\begin{itemize}
-
-  \item \texttt{CUT\_CELL(icc).vol}: cut-cell volume.
-
-  \item \texttt{CUT\_CELL(icc).XYZCEN}:  $x,y,z$ coordinates of cut-cell \textit{icc} volume centroid.
-
-  \item \texttt{CUT\_CELL(icc).NCFACES}: number of faces in the \texttt{CUT\_FACE} data structure.
-
-  \item \texttt{CUT\_CELL(icc).CFACES}: index vector to location of cut-faces in \texttt{CUT\_FACE} data structure.
-
-  \item \texttt{CUT\_CELL(icc).IJK}: denotes the Cartesian grid \textit{cell} this cut-cell belongs to.
-
-  \item \texttt{CUT\_CELL(icc).HINTFLG}: Integer flag that denotes if the pressure $H$ needs to be interpolated to the \texttt{CUT\_CELL(icc).XYZCEN} from the \texttt{GASPHASE} surroundings, and type of interpolation to perform.
-
-\end{itemize}
+%\subsubsection{Complex Geometry}
 %
-Other fields will need to be incorporated to this data structure. Among them an unknown number for scalar and possibly the pressure H, if pressure is dealt with using the unstructured scheme.
-
-
-
-\subsubsection*{Data structures currently used on the FDS IBM code:}
-
-\begin{myfont}
-
-\noindent TYPE CUTCELL\_LINKED\_LIST\_TYPE \\
-\indent  INTEGER :: INDEX                                   ! data \\
-\indent  TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: NEXT    ! nxt el \\
-\indent   REAL(EB) :: AREA                                   ! cutcell area for index \\
-\noindent END TYPE CUTCELL\_LINKED\_LIST\_TYPE \\
-
-\noindent TYPE CUTCELL\_TYPE \\
-\indent   REAL(EB) :: VOL,RHO,TMP,DIV,A(6),S,N(3) \\
-\indent   REAL(EB), ALLOCATABLE, DIMENSION(:) :: ZZ \\
-\indent   ! identify each face with area contribution to current cutcell \\
-\indent   ! note: this must include the faces and areas of Cartesian cells \\
-\indent   TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_FACE\_LIST \\
-\noindent END TYPE CUTCELL\_TYPE \\
-
-\noindent TYPE FACET\_TYPE \\
-\indent   INTEGER :: VERTEX(3)=0,SURF\_INDEX=0,BOUNDARY\_TYPE \\
-\indent   CHARACTER(LABEL\_LENGTH) :: SURF\_ID='null' \\
-\indent   REAL(EB) :: NVEC(3)=0.\_EB,AW,EW,KW,DN,RDN,RHO\_F,U\_TAU,Y\_PLUS,TMP\_F, \\
-\indent TMP\_G,QCONF,HEAT\_TRANS\_COEF,QRADIN,QRADOUT \\
-\indent   REAL(EB), ALLOCATABLE, DIMENSION(:) :: RHODW,ZZ\_F \\
-\indent   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: ILW \\
-\indent   TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_LIST \\
-\noindent END TYPE FACET\_TYPE \\
-
-\noindent TYPE(FACET\_TYPE), ALLOCATABLE, TARGET, DIMENSION(:) :: FACET \\
-
-\noindent TYPE VOLUME\_TYPE \\
-\indent   INTEGER :: VERTEX(4)=0 \\
-\indent   CHARACTER(LABEL\_LENGTH) :: MATL\_ID='null' \\
-\noindent END TYPE VOLUME\_TYPE \\
-
-\noindent TYPE(VOLUME\_TYPE), ALLOCATABLE, TARGET, DIMENSION(:) :: VOLUME \\
-
-\end{myfont}
-
-
-\subsubsection*{Proposed Data structures for the FDS CCIBM code:}
-
-The previously defined derived type \texttt{CUTCELL\_LINKED\_LIST\_TYPE} refers to \texttt{INBOUNDARY} cut-faces as defined in the Matlab data structures. Also, previously there was no need for a proper volume cut-cell linked list type, because (from what I understand) things on previous development didn't get to this stage (looks like Charles Luo was playing with one CC on the INIT\_IBM subroutine, line $\simeq 2750$ of \texttt{geom.f90}).
-We modify the previously derived types keeping the data already defined and needed, and considering the Matlab code data containers:
-\newline
-
-\noindent  - One type \texttt{CUTFACE\_LINKED\_LIST\_TYPE} to create a linked list with the data corresponding to the \texttt{CUT\_FACE} data structure in the Matlab code. The type proposed is:
-
-\begin{myfont}
-\noindent TYPE CUTFACE\_LINKED\_LIST\_TYPE \\
-\indent  INTEGER :: INDEX                                                                        ! Cut- face index \\
-\indent  TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: NEXT    ! nxt cut-face \\
-\indent   REAL(EB), DIMENSION(NDIM) :: XYZCEN                                 ! cut-face centroid coords \\
-\indent   INTEGER :: NVERTEX, STATUS, IJK, AXIS, BCTYPE(NSCALARS)            \\
-\indent   ! Vertex coordinates, to be allocated (NDIM,NVERTEX) \\
-\indent   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: XYZVERT \\
-\indent   REAL(EB) :: BCVAL(NSCALARS) \\
-\noindent END TYPE CUTFACE\_LINKED\_LIST\_TYPE \\
-\end{myfont}
-Other fields can be added as needed.
-
-\noindent  - One new type \texttt{CUTCELL\_LINKED\_LIST\_TYPE} to create a linked list with the data corresponding to the \texttt{CUT\_CELL} data with basic cut-cell info for flux definitions and volume integrals:
-\begin{myfont}
-\noindent TYPE CUTCELL\_LINKED\_LIST\_TYPE \\
-\indent  INTEGER :: INDEX                                                                        ! Cut-cell index \\
-\indent  TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: NEXT    ! nxt cut-cell \\
-\indent  REAL(EB) :: VOL                                                                           ! cut-cell volume \\
-\indent  REAL(EB), DIMENSION(NDIM) :: XYZCEN                                 ! cut-cellcentroid coords \\
-\indent  ! List of cut-faces that are boundary of this cut-cell \\
-\indent  TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_CUTFACES\_LIST \\
-\indent  INTEGER :: IJK, HINTFLG ! IJK underlying Cartesian cell. \\
-\noindent END TYPE CUTFACE\_LINKED\_LIST\_TYPE \\
-\end{myfont}
-Other fields added as needed (\texttt{RHO,TMP,DIV,ZZ} etc.).
-
-\noindent We need to change the name of the linked list to cut-faces in the \texttt{FACET\_TYPE} definition: \\
-\begin{myfont}
-\indent   TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_LIST \\
-\end{myfont}
-\noindent  to
-\begin{myfont}
-TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: FACET\_CUTFACES\_LIST \\
-\end{myfont}
-\noindent to define correctly the type of geometry entity the list refers to.
-
-Then we would define: \\
-\begin{myfont}
-\noindent !LL of cut-faces for mesh M. \\
-\noindent TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: CUT\_FACE\_LL \\
-\noindent !LL of cut-cells for mesh M. \\
-\noindent TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUT\_CELL\_LL \\
-\end{myfont}
-
-From my understanding on linked lists, using a \texttt{CUTCELL\_CUTFACES\_LIST} for each cut-cell defined in \texttt{CUT\_FACE\_LL, CUT\_CELL\_LL} and also for some \texttt{FACET} would mean we have to replicate cut-face data at least 3 times? Cut-faces stored on the different lists would be individualized by their global cut-face \texttt{INDEX}. This seems convoluted and prone to bugs.
-The other option is to use the \texttt{CUT\_FACE\_LL} linked list to generate an allocatable data structure \texttt{CUT\_FACE} with same fields, and define also \texttt{CUT\_CELL} in the same manner. The \texttt{CUT\_CELL} data structure size can be estimated from the beginning knowing the number of Cartesian cells that are cut. Then, \texttt{FACET} would have an allocatable index array to the \texttt{CUT\_FACE} data structure.
-
-\textit{We need to discuss this..}
-
-
-\subsubsection*{Containers for Pressure and scalar unknowns numbering:}
-
-\textit{To come..}
-
-\newpage
-
-
-
-
-\begin{figure}
-\begin{center}
-\begin{tikzpicture}[scale=1]
-
-\coordinate (O) at (0,0);
-\coordinate (P) at (10,10);
-
-\draw[help lines] (O) grid [step=2cm] (P);
-
-\end{tikzpicture}
-\caption{Structured, staggered grid in FDS.  Mesh variables belong to {\ct M=>MESHES(NM)}. }
-\label{fig:struc_stag_grid}
-\end{center}
-\end{figure}
-
-
-\begin{figure}
-\begin{center}
-
-\newcommand{\Depth}{3}
-\newcommand{\Height}{3}
-\newcommand{\Width}{3}
-
-\tdplotsetmaincoords{70}{30}
-
-\begin{tikzpicture}[scale=2,tdplot_main_coords]
-
-  \coordinate (O) at (0,0,0);
-  \coordinate (A) at (0,\Width,0);
-  \coordinate (B) at (0,\Width,\Height);
-  \coordinate (C) at (0,0,\Height);
-  \coordinate (D) at (\Depth,0,0);
-  \coordinate (E) at (\Depth,\Width,0);
-  \coordinate (F) at (\Depth,\Width,\Height);
-  \coordinate (G) at (\Depth,0,\Height);
-
-  \tdplotsetcoord{P}{1}{45}{45}
-  \draw[ultra thick,->] (0,0,0) -- (1,0,0) node[anchor=north east]{$x$};
-  \draw[ultra thick,->] (0,0,0) -- (0,1,0) node[anchor=north west]{$y$};
-  \draw[ultra thick,->] (0,0,0) -- (0,0,1) node[anchor=north east]{$z$};
-%  \draw[-stealth,color=red] (O) -- (P);
-%  \draw[dashed, color=red] (O) -- (Px);
-%  \draw[dashed, color=red] (O) -- (Py);
-%  \draw[dashed, color=red] (O) -- (Pz);
-%  \draw[dashed, color=red] (Px) -- (Pxy);
-%  \draw[dashed, color=red] (Py) -- (Pxy);
-%  \draw[dashed, color=red] (Px) -- (Pxz);
-%  \draw[dashed, color=red] (Pz) -- (Pxz);
-%  \draw[dashed, color=red] (Py) -- (Pyz);
-%  \draw[dashed, color=red] (Pz) -- (Pyz);
-%  \draw[dashed, color=red] (Pxy) -- (P);
-%  \draw[dashed, color=red] (Pxz) -- (P);
-%  \draw[dashed, color=red] (Pyz) -- (P);
-
-  \draw[fill=gray!50,opacity=0.5] (O) -- (A) -- (E) -- (D) -- cycle;
-  \draw[fill=gray!50,opacity=0.5] (O) -- (A) -- (B) -- (C) -- cycle;
-  \draw[fill=gray!50,opacity=0.5] (A) -- (B) -- (F) -- (E) -- cycle;
-
-  \draw[fill=gray!50,opacity=0.5,thick] (D) -- (E) -- (F) -- (G) -- cycle;
-  \draw[fill=gray!50,opacity=0.5,thick] (C) -- (B) -- (F) -- (G) -- cycle;
-  \draw[fill=gray!50,opacity=0.5,thick] (O) -- (C) -- (G) -- (D) -- cycle;
-
-  %% Following is for debugging purposes so you can see where the points are
-  % These are last so that they show up on top
-  \foreach \xy in {O, A, B, C, D, E, F, G}{
-      \node at (\xy) {\xy};
-  }
-
-  % DX(I)
-  \draw [blue,<-] (0,-.4*\Width,0) -- (.35*\Depth,-.4*\Width,0);
-  \draw [blue,->] (.65*\Depth,-.4*\Width,0) -- (\Depth,-.4*\Width,0);
-  \draw [blue,-] (0,-.5*\Width,0) -- (0,-.1*\Width,0);
-  \draw [blue,-] (\Depth,-.5*\Width,0) -- (\Depth,-.1*\Width,0);
-  \draw (.5*\Depth,-.4*\Width,0) node {\ct DX(I)};
-
-  % DY(J)
-  \draw [blue,<-] (1.3*\Depth,0,0) -- (1.3*\Depth,0.35*\Width,0);
-  \draw [blue,->] (1.3*\Depth,0.65*\Width,0) -- (1.3*\Depth,\Width,0);
-  \draw [blue,-] (1.1*\Depth,0,0) -- (1.4*\Depth,0,0);
-  \draw [blue,-] (1.1*\Depth,\Width,0) -- (1.4*\Depth,\Width,0);
-  \draw (1.3*\Depth,.5*\Width,0) node {\ct DY(J)};
-
-  % DZ(K)
-  \draw [blue,<-] (1.3*\Depth,\Width,0) -- (1.3*\Depth,\Width,0.45*\Height);
-  \draw [blue,->] (1.3*\Depth,\Width,0.55*\Height) -- (1.3*\Depth,\Width,\Height);
-  \draw [blue,-] (1.1*\Depth,\Width,\Height) -- (1.4*\Depth,\Width,\Height);
-  \draw (1.3*\Depth,\Width,.5*\Height) node {\ct DZ(K)};
-
-  % XC(I),YC(J),ZC(K)
-  \filldraw [black] (.5*\Depth,.5*\Width,.5*\Height) circle (2pt);
-  \node at (.5*\Depth,1.3*\Width,1.2*\Height) {\ct XC(I),YC(J),ZC(K)};
-  \node at (.5*\Depth,1.3*\Width,1.3*\Height) {\ct RHO(I,J,K),ZZ(I,J,K,N),TMP(I,J,K),H(I,J,K)};
-  \draw [blue] (.5*\Depth,.55*\Width,.55*\Height) -- (.5*\Depth,1.25*\Width,1.15*\Height);
-
-  % velocity components
-  \draw [->, ultra thick, >=latex] (.9*\Depth,.5*\Width,.5*\Height) -- (1.1*\Depth,.5*\Width,.5*\Height);
-  \draw [->, ultra thick, >=latex] (.5*\Depth,.9*\Width,.5*\Height) -- (.5*\Depth,1.1*\Width,.5*\Height);
-  \draw [->, ultra thick, >=latex] (.5*\Depth,.5*\Width,.9*\Height) -- (.5*\Depth,.5*\Width,1.1*\Height);
-
-  \node at (\Depth,.5*\Width,.4*\Height) {\ct U(I,J,K)};
-  \node at (.75*\Depth,\Width,.5*\Height) {\ct V(I,J,K)};
-  \node at (.45*\Depth,.6*\Width,1.1*\Height) {\ct W(I,J,K)};
-
-  % shade solid volume
-  \coordinate (V1) at (0,.75*\Width,\Height);
-  \coordinate (V2) at (.75*\Depth,0,\Height);
-  \coordinate (V3) at (0,0,.1*\Height);
-
-  % face normal
-  \coordinate (N1) at (.25*\Depth,.25*\Width,.7*\Height);
-  \coordinate (N2) at (.4*\Depth,.4*\Width,.55*\Height);
-  \draw [->, thick, >=latex] (N1) -- (N2);
-  \draw [fill=red,opacity=0.5,thick] (V1) -- (V2) -- (V3) -- cycle;
-  \draw [fill=green,opacity=0.5] (V2) -- (V1) -- (C) -- (V3) -- cycle;
-
-  % facet vertices intersecting with box
-  \draw (C) -- (G);
-  \filldraw [gray] (V1) circle (2pt);
-  \filldraw [gray] (V2) circle (2pt);
-  \filldraw [gray] (V3) circle (2pt);
-  \node at (.75*\Depth,0,.9*\Height) {$V_2$};
-  \node at (-.05*\Depth,.75*\Width,1.05*\Height) {$V_1$};
-  \node at (-.05*\Depth,-.05*\Width,.1*\Height) {$V_3$};
-
-\end{tikzpicture}
-
+%For complex geometry the surface usually does not align itself with the face of a Cartesian grid cell. A given velocity component, therefore, is not on a boundary, but must still satisfy the governing equations subject to the prescribed boundary conditions (position and properties of the surface).  The essential task of a direct-forcing immersed boundary method is to set $u_i^{ibm}$ to achieve a stable and accurate numerical solution as well as an adequate representation of the local flow physics (surface stress, pressure gradient, etc.) without the luxury of infinitely high resolution.
+%
+%In FDS, there are three IBM options for momentum, set by, for example,
+%\small
+%\begin{verbatim}
+%&MISC IMMERSED_BOUNDARY_METHOD=1/ ! options are 0,1,2
+%\end{verbatim}
+%\normalsize
+%Following is a brief description of each option. The basic linear interpolation method of Fadlun \cite{Fadlun:temp} is given by option (1), and will be used for the examples to follow later in this paper. Refer to the diagram in Fig.~\ref{fig:position_definitions} for position definitions.
+%
+%\paragraph{\ct IMMERSED\_BOUNDARY\_METHOD=0}
+%
+%The velocity component force term is unaltered if it falls on the positive side of the surface.  Let $\mathbf{x}_{velo}$ denote the location of the velocity component, $\mathbf{v}_i, (i=1,2,3)$ are the vertices of a face, $\mathbf{n} = (\mathbf{v}_2-\mathbf{v}_1) \times (\mathbf{v}_3-\mathbf{v}_1)$ is the face normal, and let $\mathbf{r} \equiv \mathbf{x}_{velo} - \mathbf{v}_1$ (any of the vertices will do); then if $\delta n =\mathbf{r} \cdot \mathbf{n} > 0$ the velocity component is processed as usual; if the dot product is negative the velocity is ``inside'' the obstruction and is set to zero.  This effectively leads to a zeroth-order (Lego block) representation of the surface.
+%
+%\paragraph{\ct IMMERSED\_BOUNDARY\_METHOD=1}
+%
+%The basic linear interpolation scheme of Fadlun starts by identifying a point $\mathbf{x}_{int}$ (see Fig.~\ref{fig:position_definitions}) which is twice the normal distance from the surface as the position of the velocity component, $\mathbf{x}_{velo}$.  The value $u_i(\mathbf{x}_{int}) = u_{i,int}$ is found from a trilinear interpolation of the neighboring staggered velocity component values from the previous time step.  The value of $u_i^{ibm}$ is then taken from a linear interpolation between $u_{i,int}$ and the wall value of the velocity component, $u_{i,w}$ (usually zero).  Thus, $u_i^{ibm} = \frac{1}{2}(u_{i,int} + u_{i,w})$.
+%
+%\paragraph{\ct IMMERSED\_BOUNDARY\_METHOD=2}
+%
+%Here the linear profile is replaced by a prescribed wall-normal profile for the mean streamwise velocity.  This requires that we first define a new streamwise coordinate system.  Referring to Fig.~\ref{fig:position_definitions}, let $\mathbf{e}_i, (i=1,2,3)$ define an orthonormal set of basis vectors for our Cartesian grid system and let $\mathbf{\bar{e}}_i, (i=1,2,3)$ define the new streamwise system where $\mathbf{\bar{e}}_1$ is the streamwise direction and $\mathbf{\bar{e}}_3$ is the wall-normal direction.  It is useful to define the new system so that the velocity component in $\mathbf{\bar{e}}_2$ is always zero.  This is achieved as follows: Define a tangent vector $\mathbf{t} \equiv \mathbf{n} \times (\mathbf{u} - \mathbf{u}_w)$ where $\mathbf{u}_w$ is the velocity of the wall (usually zero) and $\mathbf{n}$ is a wall-normal vector. The streamwise basis vector is then found from $\mathbf{\hat{s}} = \mathbf{\hat{t}} \times \mathbf{\hat{n}}$.  The hat represents a unit normal, e.g., $\mathbf{\hat{n}} \equiv \mathbf{n}/|\mathbf{n}|$.  The new streamwise system is then given by $\mathbf{\bar{e}_1}=\mathbf{\hat{s}}$, $\mathbf{\bar{e}_2}=\mathbf{\hat{t}}$, and $\mathbf{\bar{e}_3}=\mathbf{\hat{n}}$. (To conform to the convention used in the atmospheric community, in FDS, the ``vertical'' or surface-normal component is taken as the ``$z$'' component.  Hence, 2D flows are in the $x-z$ plane.)  The elements of the directional cosine matrix are now simply $a_{ij} = \mathbf{e}_i \cdot \mathbf{\bar{e}}_j$.  Velocity vectors may be transformed from the grid system to the streamwise system via $\bar{u}_k = a_{ik} u_i$ and back again via $u_i = a_{ik} \bar{u}_k$ (see, e.g., \cite{Pope:2000} Appendix B).
+%
+%To evaluate the streamwise profile, all three staggered velocity components are interpolated to $\mathbf{x}_{int}$ and the vector is transformed into the streamwise system.  The streamwise component at $\mathbf{x}_{int}$ is used to define the profile $f(n)$, which is then used to specify the streamwise component at the position of interest ($\mathbf{x}_{velo}$ in the grid system).  Thus, we obtain $\bar{u}_1^{ibm} = f(\delta n)$.  Here note that the bar indicates we are in the streamwise coordinate system.  We need to specify the other two components before we can transform back to the grid system.  As mentioned, the tangential component is zero by construction. Specification of the normal component is currently an active area of research \cite{Choi:2007:temp}.  What complicates matters is that we have two invariants to satisfy: (1) the divergence and (2) the kinetic energy. The kinetic energy is the easier of the two because it does not involve differences.  Still, since all we know from the model is a mean profile, some sort of \emph{ad hoc} assumption must be made.  Given $k_{int}=\frac{1}{2}u_i u_i$ at $\mathbf{x}_{int}$, we use a linear interpolation to determine $k(\delta n) = \frac{1}{2}(k_{int} + k_w)$, where $k_w$ is the kinetic energy at the wall (usually zero).  The magnitude of the normal component is then found from $|\bar{u}_3^{ibm}| = +\sqrt{2k(\delta n) - (\bar{u}_1^{ibm})^2}$.  Finally, the component value of interest is obtained from the transformation $u_i^{ibm} = a_{ik} \bar{u}_k^{ibm}$, where only the $i$th component is retained at the staggered location.
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tikzpicture}[scale=1.25]
+%
+%\draw [fill=lightgray] (0.2,0.5) -- (2.2,3.8) -- (4.5,3.1) -- (0.2,0.5);
+%
+%\draw[help lines] (-3,-1) grid [step=2cm] (5,7);
+%
 %\draw (0.30,0.25) node {$\mathbf{v}_1$};
 %\draw (4.80,3.10) node {$\mathbf{v}_2$};
 %\draw (2.20,4.00) node {$\mathbf{v}_3$};
@@ -1819,11 +1705,424 @@ The other option is to use the \texttt{CUT\_FACE\_LL} linked list to generate an
 %\draw [->] ( 0.54,2.280) -- (2.15,2.280);
 %\draw [->] ( 0.90,1.800) -- (1.80,1.800);
 %\draw (1.5,5.0) node {$f(n)$};
-
-\caption{Cartesian cell {\ct (I,J,K)} in FDS.}
-\label{fig:cartesian_cell}
-\end{center}
-\end{figure}
+%
+%\end{tikzpicture}
+%
+%\caption{Position definitions for a single facet.  The function $f(n)$ represents the mean streamwise velocity profile in the wall-normal direction.}
+%\label{fig:position_definitions}
+%\end{center}
+%\end{figure}
+%
+%\paragraph{Remark} As can be seen, in going from IBM methods 0 to 2 the level of complexity increases significantly.  For the remainder of this paper, we utilize method 1.  The main reason is that our focus here is on the additional complexities that arise with considering heat and mass transfer near infinitely thin obstructions.
+%
+%%\subsubsection{Convergence of IBM 1}
+%%\label{sec:momentum_convergence}
+%%
+%%In this section we show second-order convergence for IBM 1 by examining the 2D flow near a rotating disk.
+%
+%\subsection{Heat and Mass Transfer}
+%
+%This is where the formulation gets tricky.  Both heat and mass transfer present challenges for a typical IBM formulation.  For heat transfer, numerical diffusion from the gas phase domain into the solid domain implies that global energy is not conserved.  For mass transfer, when considering the ``mixed is burnt'' model for combustion chemistry, any numerical diffusion of reactant species across a solid boundary can be fatal to a calculation.  For these reasons, we have chosen to implement a hybrid cutcell immersed boundary method (CIBM), where the cutcells on the immersed boundary surface are treated by an unstructured finite volume solver for heat and mass transport.  This ensures strict conservation of mass and energy in the fluid domain.
+%
+%\subsubsection{To-Do List}
+%
+%\begin{enumerate}
+%\item Identify cutcells.  Find the Cartesian cells that intersect with solid tet volumes.  To handle zero thickness obstructions we either need the ability to treat facets by themselves or we may allow ``volumes'' with zero volume.  To be discussed.
+%\item Compute cutcell (CC) volumes.  Let $V_{cell}$ denote the volume of the Cartesian cell.  Let $V_{tet}$ denote a tetrahedral volume.  The cutcell volume is $V_{cc} = V_{cell} - ( V_{cell} \cap V_{tet} )$.
+%\item Merge small cells.  If $V_{cc} < V_{tol}$, merge with a neighboring cell (Cartesian cell or cutcell).  This limits CFL time step restrictions.
+%\item Compute surface areas and unit normal vectors for final cutcell volumes.
+%\item Interpolate scalars (density, mass fractions, temperature) to CC volume faces (see below).
+%\item Interpolate velocity components to CC faces (see below).
+%\item Update finite volumes equations (see below).
+%\item Construct Cartesian divergence from CC divergence integral (see below).
+%\item Update Poisson equation as usual (see FDS Tech Guide).
+%\item Reconstruct velocity field to satisfy projection and CC constraints (see below).
+%\end{enumerate}
+%
+%\newpage
+%
+%\subsubsection{FDS Grid Data Structure}
+%
+%
+%In the following, variables and proposed data lists for cut-cells and faces to be used in the FDS CCIBM code are described. Data structures from the prototype Matlab code and linked list definitions from the current FDS IBM implementation are included for clarity. Names can be changed if there are issues with the existing FDS namespace, etc. Also, we keep it general for now.
+%
+%
+%\subsubsection*{Some type defining and indexing parameters:}
+%
+%The following parameters are used in defining the type (or status) of cell or cell face on Cartesian grid or solid surfaces: \\
+%\texttt{INTEGER, PARAMETER :: GASPHASE     = -1} \\
+%\texttt{INTEGER, PARAMETER :: CUTCF         =   0} \\
+%\texttt{INTEGER, PARAMETER :: SOLID              =   1} \\
+%\texttt{INTEGER, PARAMETER :: INBOUNDARY =   2} \\
+%
+%
+%
+%\subsubsection*{New Cartesian grid variables:}
+%
+%- \textit{Cell-centered} variables for cell-type identification, unknown numbering, etc.:  \\
+% \texttt{INTEGER} \texttt{CCVAR(I,J,K,ICVAR)}: Here,  \texttt{ICVAR} can be equal to:   \\
+%%
+%\begin{itemize}
+%
+%  \item \texttt{INTEGER, PARAMETER :: IGSC = 1} such that: \\
+%           - \texttt{CCVAR(I,J,K,IGSC) == GASPHASE} is a regular \texttt{GASPHASE} cell. \\
+%           - \texttt{CCVAR(I,J,K,IGSC) == CUTCF} is a cut-cell, i.e. cell transversed by the solid wet surface. \\
+%           - \texttt{CCVAR(I,J,K,IGSC) == SOLID} is a regular cell immersed completely in the solid region.
+%
+%  \item \texttt{ICVAR} can take other values (2, 3,... to be added later) to map unknowns to \texttt{CUT\_CELL} data, linear systems, etc.
+%
+%
+%\end{itemize}
+%%
+%- \textit{Face-centered} variables for face-type identification, generating data necessary for matrix and vector building (face based),  etc.:  \\
+%\texttt{INTEGER} \texttt{FCVAR(I,J,K,IFVAR)}: Here,  \texttt{IFVAR} can be equal to:   \\
+%%
+%\begin{itemize}
+%
+%  \item \texttt{INTEGER, PARAMETER :: FGSC = 1} such that: \\
+%           - \texttt{FCVAR(I,J,K,FGSC) == GASPHASE} is a regular \texttt{GASPHASE} face. \\
+%           - \texttt{FCVAR(I,J,K,FGSC) == CUTCF} is a cut-face, i.e. face transversed by the solid wet surface. \\
+%           - \texttt{FCVAR(I,J,K,FGSC) == SOLID} is a regular face immersed completely in the solid region.
+%
+%  \item \texttt{FCVAR} can take other values (2,3,... to be added later) to map face indexes to \texttt{CUT\_FACE} data, etc.
+%
+%
+%\end{itemize}
+%%
+%These variables are defined by mesh, so they can be included as \texttt{ALLOCATABLE} in the \texttt{TYPE\_MESH}, and be allocated if using CCIBM.
+%
+%
+%\subsubsection*{Data structures currently used on the Matlab prototype code:}
+%
+%- Data structure \texttt{CUT\_FACE}: Contains all \texttt{GASPHASE} and \texttt{INBOUNDARY} cut-faces. The latter are defined in the immersed solid surface and are used to impose boundary conditions for scalars. The total number of cut-faces is \texttt{NCUTFACE}. For a given cut-face \textit{icf}, the data structure has fields:
+%%
+%\begin{itemize}
+%
+%  \item  \texttt{CUT\_FACE(icf).XYZVERT}: $x,y,z$ coordinates of cut-face \textit{icf} vertex points. They are composed of intersection points between solid and Cartesian cell faces, and cell or facet vertices. These can be stored on a Global array as discussed with Glenn, and \texttt{XYZVERT} can be replaced by an index vector. They are used to define geometric data and also for plotting purposes (would be used in SMV).
+%
+%  \item  \texttt{CUT\_FACE(icf).XYZCEN}: $x,y,z$ coordinates of cut-face \textit{icf} area centroid.
+%
+%  \item  \texttt{CUT\_FACE(icf).STATUS}: can be \texttt{GASPHASE} or \texttt{INBOUNDARY}.
+%
+%  \item  \texttt{CUT\_FACE(icf).IJK}: If \texttt{CUT\_FACE(icf).STATUS == GASPHASE}, \texttt{ijk} denotes the Cartesian grid \textit{face} the cut-face belongs to. If  \texttt{CUT\_FACE(icf).STATUS == INBOUNDARY},  \texttt{ijk} denotes the Cartesian grid \textit{cell} this cut-face belongs to.
+%
+%  \item  \texttt{CUT\_FACE(icf).AXIS}: If \texttt{CUT\_FACE(icf).STATUS == GASPHASE}, this face is normal to which axis? \texttt{AXIS} can be \texttt{== IAXIS=1} for x-faces, \texttt{== JAXIS=2} for y-faces and \texttt{== KAXIS=3} for z-faces.  \texttt{CUT\_FACE(icf).STATUS == INBOUNDARY}, then  \texttt{AXIS} is zero.
+%
+%  \item \texttt{CUT\_FACE(icf).NIJK}: normal unit vector to the cut-face. If \texttt{CUT\_FACE(icf).AXIS == IAXIS} then \texttt{NIJK=[1. 0. 0.]}, if
+%  \texttt{CUT\_FACE(icf).AXIS == JAXIS} then \texttt{NIJK=[0. 1. 0.]}, \texttt{CUT\_FACE(icf).AXIS == KAXIS} then  \texttt{NIJK=[0. 0. 1.]}. If \texttt{CUT\_FACE(icf).AXIS == 0},  \texttt{NIJK} is the normal outside of the body for that \texttt{INBOUNDARY} cut-face.
+%
+%  \item \texttt{CUT\_FACE(icf).BCTYPE(1:NSCALARS)}: boundary condition type, integer that for \texttt{INBOUNDARY} cut-faces, specifies the type of boundary condition imposed for scalars (i.e. constant mass flux, wall, etc.).
+%
+%  \item \texttt{CUT\_FACE(icf).BCVAL(1:NSCALARS)}: mean boundary condition value assigned for this \texttt{INBOUNDARY} cut-face, for each scalar.
+%
+%\end{itemize}
+%%
+%Some of the data here is redundant and won't need to be filled up. Now, as in this construct cut faces can be either \texttt{GASPHASE} or \texttt{INBOUNDARY}, we might want to separate these in two structs (i.e. CUT\_FACE\_GP and CUT\_FACE\_BD) to avoid conditionals on cut-face loops.
+%
+%
+%- Data structure \texttt{CUT\_CELL}: Contains all \texttt{GASPHASE} cut-cells. The total number of cut-cells is \texttt{NCUTCELL}. For a given cut-cell \textit{icc}, the data structure has fields:
+%%
+%\begin{itemize}
+%
+%  \item \texttt{CUT\_CELL(icc).vol}: cut-cell volume.
+%
+%  \item \texttt{CUT\_CELL(icc).XYZCEN}:  $x,y,z$ coordinates of cut-cell \textit{icc} volume centroid.
+%
+%  \item \texttt{CUT\_CELL(icc).NCFACES}: number of faces in the \texttt{CUT\_FACE} data structure.
+%
+%  \item \texttt{CUT\_CELL(icc).CFACES}: index vector to location of cut-faces in \texttt{CUT\_FACE} data structure.
+%
+%  \item \texttt{CUT\_CELL(icc).IJK}: denotes the Cartesian grid \textit{cell} this cut-cell belongs to.
+%
+%  \item \texttt{CUT\_CELL(icc).HINTFLG}: Integer flag that denotes if the pressure $H$ needs to be interpolated to the \texttt{CUT\_CELL(icc).XYZCEN} from the \texttt{GASPHASE} surroundings, and type of interpolation to perform.
+%
+%\end{itemize}
+%%
+%Other fields will need to be incorporated to this data structure. Among them an unknown number for scalar and possibly the pressure H, if pressure is dealt with using the unstructured scheme.
+%
+%
+%
+%\subsubsection*{Data structures currently used on the FDS IBM code:}
+%
+%\begin{myfont}
+%
+%\noindent TYPE CUTCELL\_LINKED\_LIST\_TYPE \\
+%\indent  INTEGER :: INDEX                                   ! data \\
+%\indent  TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: NEXT    ! nxt el \\
+%\indent   REAL(EB) :: AREA                                   ! cutcell area for index \\
+%\noindent END TYPE CUTCELL\_LINKED\_LIST\_TYPE \\
+%
+%\noindent TYPE CUTCELL\_TYPE \\
+%\indent   REAL(EB) :: VOL,RHO,TMP,DIV,A(6),S,N(3) \\
+%\indent   REAL(EB), ALLOCATABLE, DIMENSION(:) :: ZZ \\
+%\indent   ! identify each face with area contribution to current cutcell \\
+%\indent   ! note: this must include the faces and areas of Cartesian cells \\
+%\indent   TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_FACE\_LIST \\
+%\noindent END TYPE CUTCELL\_TYPE \\
+%
+%\noindent TYPE FACET\_TYPE \\
+%\indent   INTEGER :: VERTEX(3)=0,SURF\_INDEX=0,BOUNDARY\_TYPE \\
+%\indent   CHARACTER(LABEL\_LENGTH) :: SURF\_ID='null' \\
+%\indent   REAL(EB) :: NVEC(3)=0.\_EB,AW,EW,KW,DN,RDN,RHO\_F,U\_TAU,Y\_PLUS,TMP\_F, \\
+%\indent TMP\_G,QCONF,HEAT\_TRANS\_COEF,QRADIN,QRADOUT \\
+%\indent   REAL(EB), ALLOCATABLE, DIMENSION(:) :: RHODW,ZZ\_F \\
+%\indent   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: ILW \\
+%\indent   TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_LIST \\
+%\noindent END TYPE FACET\_TYPE \\
+%
+%\noindent TYPE(FACET\_TYPE), ALLOCATABLE, TARGET, DIMENSION(:) :: FACET \\
+%
+%\noindent TYPE VOLUME\_TYPE \\
+%\indent   INTEGER :: VERTEX(4)=0 \\
+%\indent   CHARACTER(LABEL\_LENGTH) :: MATL\_ID='null' \\
+%\noindent END TYPE VOLUME\_TYPE \\
+%
+%\noindent TYPE(VOLUME\_TYPE), ALLOCATABLE, TARGET, DIMENSION(:) :: VOLUME \\
+%
+%\end{myfont}
+%
+%
+%\subsubsection*{Proposed Data structures for the FDS CCIBM code:}
+%
+%The previously defined derived type \texttt{CUTCELL\_LINKED\_LIST\_TYPE} refers to \texttt{INBOUNDARY} cut-faces as defined in the Matlab data structures. Also, previously there was no need for a proper volume cut-cell linked list type, because (from what I understand) things on previous development didn't get to this stage (looks like Charles Luo was playing with one CC on the INIT\_IBM subroutine, line $\simeq 2750$ of \texttt{geom.f90}).
+%We modify the previously derived types keeping the data already defined and needed, and considering the Matlab code data containers:
+%\newline
+%
+%\noindent  - One type \texttt{CUTFACE\_LINKED\_LIST\_TYPE} to create a linked list with the data corresponding to the \texttt{CUT\_FACE} data structure in the Matlab code. The type proposed is:
+%
+%\begin{myfont}
+%\noindent TYPE CUTFACE\_LINKED\_LIST\_TYPE \\
+%\indent  INTEGER :: INDEX                                                                        ! Cut- face index \\
+%\indent  TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: NEXT    ! nxt cut-face \\
+%\indent   REAL(EB), DIMENSION(NDIM) :: XYZCEN                                 ! cut-face centroid coords \\
+%\indent   INTEGER :: NVERTEX, STATUS, IJK, AXIS, BCTYPE(NSCALARS)            \\
+%\indent   ! Vertex coordinates, to be allocated (NDIM,NVERTEX) \\
+%\indent   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: XYZVERT \\
+%\indent   REAL(EB) :: BCVAL(NSCALARS) \\
+%\noindent END TYPE CUTFACE\_LINKED\_LIST\_TYPE \\
+%\end{myfont}
+%Other fields can be added as needed.
+%
+%\noindent  - One new type \texttt{CUTCELL\_LINKED\_LIST\_TYPE} to create a linked list with the data corresponding to the \texttt{CUT\_CELL} data with basic cut-cell info for flux definitions and volume integrals:
+%\begin{myfont}
+%\noindent TYPE CUTCELL\_LINKED\_LIST\_TYPE \\
+%\indent  INTEGER :: INDEX                                                                        ! Cut-cell index \\
+%\indent  TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: NEXT    ! nxt cut-cell \\
+%\indent  REAL(EB) :: VOL                                                                           ! cut-cell volume \\
+%\indent  REAL(EB), DIMENSION(NDIM) :: XYZCEN                                 ! cut-cellcentroid coords \\
+%\indent  ! List of cut-faces that are boundary of this cut-cell \\
+%\indent  TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_CUTFACES\_LIST \\
+%\indent  INTEGER :: IJK, HINTFLG ! IJK underlying Cartesian cell. \\
+%\noindent END TYPE CUTFACE\_LINKED\_LIST\_TYPE \\
+%\end{myfont}
+%Other fields added as needed (\texttt{RHO,TMP,DIV,ZZ} etc.).
+%
+%\noindent We need to change the name of the linked list to cut-faces in the \texttt{FACET\_TYPE} definition: \\
+%\begin{myfont}
+%\indent   TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUTCELL\_LIST \\
+%\end{myfont}
+%\noindent  to
+%\begin{myfont}
+%TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: FACET\_CUTFACES\_LIST \\
+%\end{myfont}
+%\noindent to define correctly the type of geometry entity the list refers to.
+%
+%Then we would define: \\
+%\begin{myfont}
+%\noindent !LL of cut-faces for mesh M. \\
+%\noindent TYPE(CUTFACE\_LINKED\_LIST\_TYPE), POINTER :: CUT\_FACE\_LL \\
+%\noindent !LL of cut-cells for mesh M. \\
+%\noindent TYPE(CUTCELL\_LINKED\_LIST\_TYPE), POINTER :: CUT\_CELL\_LL \\
+%\end{myfont}
+%
+%From my understanding on linked lists, using a \texttt{CUTCELL\_CUTFACES\_LIST} for each cut-cell defined in \texttt{CUT\_FACE\_LL, CUT\_CELL\_LL} and also for some \texttt{FACET} would mean we have to replicate cut-face data at least 3 times? Cut-faces stored on the different lists would be individualized by their global cut-face \texttt{INDEX}. This seems convoluted and prone to bugs.
+%The other option is to use the \texttt{CUT\_FACE\_LL} linked list to generate an allocatable data structure \texttt{CUT\_FACE} with same fields, and define also \texttt{CUT\_CELL} in the same manner. The \texttt{CUT\_CELL} data structure size can be estimated from the beginning knowing the number of Cartesian cells that are cut. Then, \texttt{FACET} would have an allocatable index array to the \texttt{CUT\_FACE} data structure.
+%
+%\textit{We need to discuss this..}
+%
+%
+%\subsubsection*{Containers for Pressure and scalar unknowns numbering:}
+%
+%\textit{To come..}
+%
+%\newpage
+%
+%
+%
+%
+%\begin{figure}
+%\begin{center}
+%\begin{tikzpicture}[scale=1]
+%
+%\coordinate (O) at (0,0);
+%\coordinate (P) at (10,10);
+%
+%\draw[help lines] (O) grid [step=2cm] (P);
+%
+%\end{tikzpicture}
+%\caption{Structured, staggered grid in FDS.  Mesh variables belong to {\ct M=>MESHES(NM)}. }
+%\label{fig:struc_stag_grid}
+%\end{center}
+%\end{figure}
+%
+%
+%\begin{figure}
+%\begin{center}
+%
+%\newcommand{\Depth}{3}
+%\newcommand{\Height}{3}
+%\newcommand{\Width}{3}
+%
+%\tdplotsetmaincoords{70}{30}
+%
+%\begin{tikzpicture}[scale=2,tdplot_main_coords]
+%
+%  \coordinate (O) at (0,0,0);
+%  \coordinate (A) at (0,\Width,0);
+%  \coordinate (B) at (0,\Width,\Height);
+%  \coordinate (C) at (0,0,\Height);
+%  \coordinate (D) at (\Depth,0,0);
+%  \coordinate (E) at (\Depth,\Width,0);
+%  \coordinate (F) at (\Depth,\Width,\Height);
+%  \coordinate (G) at (\Depth,0,\Height);
+%
+%  \tdplotsetcoord{P}{1}{45}{45}
+%  \draw[ultra thick,->] (0,0,0) -- (1,0,0) node[anchor=north east]{$x$};
+%  \draw[ultra thick,->] (0,0,0) -- (0,1,0) node[anchor=north west]{$y$};
+%  \draw[ultra thick,->] (0,0,0) -- (0,0,1) node[anchor=north east]{$z$};
+%%  \draw[-stealth,color=red] (O) -- (P);
+%%  \draw[dashed, color=red] (O) -- (Px);
+%%  \draw[dashed, color=red] (O) -- (Py);
+%%  \draw[dashed, color=red] (O) -- (Pz);
+%%  \draw[dashed, color=red] (Px) -- (Pxy);
+%%  \draw[dashed, color=red] (Py) -- (Pxy);
+%%  \draw[dashed, color=red] (Px) -- (Pxz);
+%%  \draw[dashed, color=red] (Pz) -- (Pxz);
+%%  \draw[dashed, color=red] (Py) -- (Pyz);
+%%  \draw[dashed, color=red] (Pz) -- (Pyz);
+%%  \draw[dashed, color=red] (Pxy) -- (P);
+%%  \draw[dashed, color=red] (Pxz) -- (P);
+%%  \draw[dashed, color=red] (Pyz) -- (P);
+%
+%  \draw[fill=gray!50,opacity=0.5] (O) -- (A) -- (E) -- (D) -- cycle;
+%  \draw[fill=gray!50,opacity=0.5] (O) -- (A) -- (B) -- (C) -- cycle;
+%  \draw[fill=gray!50,opacity=0.5] (A) -- (B) -- (F) -- (E) -- cycle;
+%
+%  \draw[fill=gray!50,opacity=0.5,thick] (D) -- (E) -- (F) -- (G) -- cycle;
+%  \draw[fill=gray!50,opacity=0.5,thick] (C) -- (B) -- (F) -- (G) -- cycle;
+%  \draw[fill=gray!50,opacity=0.5,thick] (O) -- (C) -- (G) -- (D) -- cycle;
+%
+%  %% Following is for debugging purposes so you can see where the points are
+%  % These are last so that they show up on top
+%  \foreach \xy in {O, A, B, C, D, E, F, G}{
+%      \node at (\xy) {\xy};
+%  }
+%
+%  % DX(I)
+%  \draw [blue,<-] (0,-.4*\Width,0) -- (.35*\Depth,-.4*\Width,0);
+%  \draw [blue,->] (.65*\Depth,-.4*\Width,0) -- (\Depth,-.4*\Width,0);
+%  \draw [blue,-] (0,-.5*\Width,0) -- (0,-.1*\Width,0);
+%  \draw [blue,-] (\Depth,-.5*\Width,0) -- (\Depth,-.1*\Width,0);
+%  \draw (.5*\Depth,-.4*\Width,0) node {\ct DX(I)};
+%
+%  % DY(J)
+%  \draw [blue,<-] (1.3*\Depth,0,0) -- (1.3*\Depth,0.35*\Width,0);
+%  \draw [blue,->] (1.3*\Depth,0.65*\Width,0) -- (1.3*\Depth,\Width,0);
+%  \draw [blue,-] (1.1*\Depth,0,0) -- (1.4*\Depth,0,0);
+%  \draw [blue,-] (1.1*\Depth,\Width,0) -- (1.4*\Depth,\Width,0);
+%  \draw (1.3*\Depth,.5*\Width,0) node {\ct DY(J)};
+%
+%  % DZ(K)
+%  \draw [blue,<-] (1.3*\Depth,\Width,0) -- (1.3*\Depth,\Width,0.45*\Height);
+%  \draw [blue,->] (1.3*\Depth,\Width,0.55*\Height) -- (1.3*\Depth,\Width,\Height);
+%  \draw [blue,-] (1.1*\Depth,\Width,\Height) -- (1.4*\Depth,\Width,\Height);
+%  \draw (1.3*\Depth,\Width,.5*\Height) node {\ct DZ(K)};
+%
+%  % XC(I),YC(J),ZC(K)
+%  \filldraw [black] (.5*\Depth,.5*\Width,.5*\Height) circle (2pt);
+%  \node at (.5*\Depth,1.3*\Width,1.2*\Height) {\ct XC(I),YC(J),ZC(K)};
+%  \node at (.5*\Depth,1.3*\Width,1.3*\Height) {\ct RHO(I,J,K),ZZ(I,J,K,N),TMP(I,J,K),H(I,J,K)};
+%  \draw [blue] (.5*\Depth,.55*\Width,.55*\Height) -- (.5*\Depth,1.25*\Width,1.15*\Height);
+%
+%  % velocity components
+%  \draw [->, ultra thick, >=latex] (.9*\Depth,.5*\Width,.5*\Height) -- (1.1*\Depth,.5*\Width,.5*\Height);
+%  \draw [->, ultra thick, >=latex] (.5*\Depth,.9*\Width,.5*\Height) -- (.5*\Depth,1.1*\Width,.5*\Height);
+%  \draw [->, ultra thick, >=latex] (.5*\Depth,.5*\Width,.9*\Height) -- (.5*\Depth,.5*\Width,1.1*\Height);
+%
+%  \node at (\Depth,.5*\Width,.4*\Height) {\ct U(I,J,K)};
+%  \node at (.75*\Depth,\Width,.5*\Height) {\ct V(I,J,K)};
+%  \node at (.45*\Depth,.6*\Width,1.1*\Height) {\ct W(I,J,K)};
+%
+%  % shade solid volume
+%  \coordinate (V1) at (0,.75*\Width,\Height);
+%  \coordinate (V2) at (.75*\Depth,0,\Height);
+%  \coordinate (V3) at (0,0,.1*\Height);
+%
+%  % face normal
+%  \coordinate (N1) at (.25*\Depth,.25*\Width,.7*\Height);
+%  \coordinate (N2) at (.4*\Depth,.4*\Width,.55*\Height);
+%  \draw [->, thick, >=latex] (N1) -- (N2);
+%  \draw [fill=red,opacity=0.5,thick] (V1) -- (V2) -- (V3) -- cycle;
+%  \draw [fill=green,opacity=0.5] (V2) -- (V1) -- (C) -- (V3) -- cycle;
+%
+%  % facet vertices intersecting with box
+%  \draw (C) -- (G);
+%  \filldraw [gray] (V1) circle (2pt);
+%  \filldraw [gray] (V2) circle (2pt);
+%  \filldraw [gray] (V3) circle (2pt);
+%  \node at (.75*\Depth,0,.9*\Height) {$V_2$};
+%  \node at (-.05*\Depth,.75*\Width,1.05*\Height) {$V_1$};
+%  \node at (-.05*\Depth,-.05*\Width,.1*\Height) {$V_3$};
+%
+%\end{tikzpicture}
+%
+%%\draw (0.30,0.25) node {$\mathbf{v}_1$};
+%%\draw (4.80,3.10) node {$\mathbf{v}_2$};
+%%\draw (2.20,4.00) node {$\mathbf{v}_3$};
+%%
+%%\draw [->, very thick, >=latex] (-2.5,5.0) -- (-1.5,5.0);
+%%\draw [->, very thick, >=latex] (-2.5,3.0) -- (-1.5,3.0);
+%%\draw [->, very thick, >=latex] (-0.5,5.0) -- (0.5,5.0);
+%%\draw [->, very thick, >=latex] (-0.5,3.0) -- (0.5,3.0);
+%%\draw (0.5,3.3) node {$\mathbf{x}_{velo}$};
+%%
+%%\draw [->, very thick, >=latex] (0.2,0.5) -- (0.0,3.0);
+%%\draw (-0.15,1.8) node {$\mathbf{r}$};
+%%
+%%\draw [->, very thick, >=latex] (0.2,0.5) -- (-1,2.0);
+%%\draw (-0.5,1.0) node {$\mathbf{n}$};
+%%
+%%\draw [->, >=*] (1.1,1.545) -- (-1.3,4.7);
+%%\draw (-1.5,4.3) node {$\mathbf{x}_{int}$};
+%%
+%%\draw [|-] (0.9,1.37) -- (0.57,1.8);
+%%\draw [-|] (0.24,2.25) -- (-0.19,2.85);
+%%\draw (.4,2.02) node {$\delta n$};
+%%
+%%\draw [->, very thick, >=latex] (1.08,1.55) -- (2.35,1.55);
+%%\draw [->, very thick, >=latex] (1.1,1.545) -- (0.45,2.4);
+%%\draw [->, very thick, >=latex] (1.1,1.545) -- (1.75,2.6);
+%%\draw (2.9,1.55) node {$\mathbf{\hat{s}} \, (\mathbf{\bar{e}}_1)$};
+%%\draw (1.9,2.60) node {$\mathbf{\hat{t}}$};
+%%\draw (0.6,2.60) node {$\mathbf{\hat{n}}$};
+%%
+%%\draw [->, very thick, >=latex] (-2,0) -- (-2,1);
+%%\draw [->, very thick, >=latex] (-2,0) -- (-1,0);
+%%\draw (-0.9,-0.25) node {$\mathbf{e}_1$};
+%%\draw (-2.35,1) node {$\mathbf{e}_3$};
+%%
+%%\draw (1,4.7) .. controls (2.5,2) .. (1.1,1.545);
+%%\draw [->] (-1.15,4.500) -- (1.10,4.500);
+%%\draw [->] (-0.58,3.750) -- (1.52,3.750);
+%%\draw [->] ( 0.20,3.003) -- (1.90,3.003);
+%%\draw [->] ( 0.54,2.280) -- (2.15,2.280);
+%%\draw [->] ( 0.90,1.800) -- (1.80,1.800);
+%%\draw (1.5,5.0) node {$f(n)$};
+%
+%\caption{Cartesian cell {\ct (I,J,K)} in FDS.}
+%\label{fig:cartesian_cell}
+%\end{center}
+%\end{figure}
 
 \bibliography{../Bibliography/FDS_general,../Bibliography/FDS_refs,../Bibliography/FDS_mathcomp,../Bibliography/sv_fire,../Bibliography/sv_graphics}
 
