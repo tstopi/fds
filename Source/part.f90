@@ -1341,7 +1341,7 @@ PARTICLE_LOOP: DO IP=1,NLP
          IC = CELL_INDEX(IIG,JJG,1)
          IW = WALL_INDEX(IC,-3)
          IF (WALL(IW)%BOUNDARY_TYPE==SOLID_BOUNDARY .AND. ACCUMULATE_WATER .AND. .NOT.LP%SPLAT) THEN
-            WALL(IW)%A_LP_MPUA(LPC%ARRAY_INDEX) = WALL(IW)%A_LP_MPUA(LPC%ARRAY_INDEX) + LP%PWT*LPC%FTPR*R_D**3*WALL(IW)%RAW
+            WALL(IW)%A_LP_MPUA(LPC%ARRAY_INDEX) = WALL(IW)%A_LP_MPUA(LPC%ARRAY_INDEX) + LP%PWT*LPC%FTPR*R_D**3/WALL(IW)%AW
             LP%SPLAT = .TRUE.
          ENDIF
          CYCLE PARTICLE_LOOP
@@ -1535,7 +1535,7 @@ PARTICLE_LOOP: DO IP=1,NLP
 
             IF (ACCUMULATE_WATER .AND. HIT_SOLID .AND. .NOT.LP%SPLAT .AND. LPC%LIQUID_DROPLET) THEN
                WALL(LP%WALL_INDEX)%A_LP_MPUA(LPC%ARRAY_INDEX) = WALL(LP%WALL_INDEX)%A_LP_MPUA(LPC%ARRAY_INDEX)+&
-                  LP%PWT*LPC%FTPR*R_D**3*WALL(LP%WALL_INDEX)%RAW
+                  LP%PWT*LPC%FTPR*R_D**3/WALL(LP%WALL_INDEX)%AW
                LP%SPLAT = .TRUE.
             ENDIF
 
@@ -2225,7 +2225,28 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
                ENDIF
             ENDIF SOLID_OR_GAS_PHASE_1
 
-            BOIL_ALL: IF (Q_DOT_RAD*DT_SUBSTEP > M_DROP*H_V) THEN
+            ! Determine the ratio of molecular weights between the gas and droplet vapor
+
+            MW_GAS = 0._EB
+            IF (ABS(Y_GAS-1._EB) > TWO_EPSILON_EB) THEN
+               DO NS=1,N_SPECIES
+                  IF (NS==Y_INDEX) CYCLE
+                  MW_GAS = MW_GAS + Y_ALL(NS)/SPECIES(NS)%MW
+               ENDDO
+               IF (MW_GAS<=TWO_EPSILON_EB) THEN
+                  MW_GAS=SPECIES_MIXTURE(1)%MW
+               ELSE
+                  MW_GAS = (1._EB-Y_GAS)/MW_GAS
+               ENDIF
+            ELSE
+               MW_GAS=SPECIES_MIXTURE(1)%MW
+            ENDIF
+            MW_RATIO = MW_GAS/MW_DROP
+
+            ! Decide whether to evporate the entire droplet or only part of it
+
+            BOIL_ALL: IF (Q_DOT_RAD*DT_SUBSTEP > M_DROP*H_V) THEN  ! boil it all
+
                M_VAP = M_DROP
                Q_RAD = M_VAP*H_V
                I_FUEL = 0
@@ -2255,31 +2276,15 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
                ! Keep track of total mass evaporated in cell
 
                MVAP_TOT(II,JJ,KK) = MVAP_TOT(II,JJ,KK) + WGT*M_VAP
-            ELSE BOIL_ALL
+
+            ELSE BOIL_ALL  ! boil only some of the liquid
 
                CALL INTERPOLATE1D_UNIFORM(LBOUND(SS%C_P_L,1),SS%C_P_L,TMP_DROP,C_DROP)
                CALL INTERPOLATE1D_UNIFORM(LBOUND(SS%C_P_L_BAR,1),SS%C_P_L_BAR,TMP_DROP,H_L)
                H_L = H_L*TMP_DROP
                H_D_OLD  = H_L*M_DROP
                DHOR     = H_V*MW_DROP/R0
-
                ZZ_GET(1:N_TRACKED_SPECIES) = ZZ_INTERIM(II,JJ,KK,1:N_TRACKED_SPECIES)
-               MW_GAS = 0._EB
-               IF (ABS(Y_GAS-1._EB) > TWO_EPSILON_EB) THEN
-                  DO NS=1,N_SPECIES
-                     IF (NS==Y_INDEX) CYCLE
-                     MW_GAS = MW_GAS + Y_ALL(NS)/SPECIES(NS)%MW
-                  ENDDO
-                  IF (MW_GAS<=TWO_EPSILON_EB) THEN
-                     MW_GAS=SPECIES_MIXTURE(1)%MW
-                  ELSE
-                     MW_GAS = (1._EB-Y_GAS)/MW_GAS
-                  ENDIF
-               ELSE
-                  MW_GAS=SPECIES_MIXTURE(1)%MW
-               ENDIF
-
-               MW_RATIO = MW_GAS/MW_DROP
 
                ! Compute equilibrium PARTICLE vapor mass fraction, Y_DROP, and its derivative w.r.t. PARTICLE temperature
 
@@ -2370,6 +2375,7 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
                IF (Y_DROP<=Y_GAS) H_MASS = 0._EB
 
                ! Build and solve implicit arrays for updating particle, gas, and wall temperatures
+
                ITMP = INT(TMP_DROP)
                H1 = H_SENS_Z(ITMP,Z_INDEX)+(TMP_DROP-REAL(ITMP,EB))*(H_SENS_Z(ITMP+1,Z_INDEX)-H_SENS_Z(ITMP,Z_INDEX))
                ITMP = INT(TMP_G)
@@ -2629,15 +2635,18 @@ SPECIES_LOOP: DO Z_INDEX = 1,N_TRACKED_SPECIES
                LP%MASS = M_DROP
 
                ! Compute surface cooling
+
                IF (IW > 0) THEN
-                  WALL(IW)%LP_CPUA(LPC%ARRAY_INDEX) = WALL(IW)%LP_CPUA(LPC%ARRAY_INDEX) + &
-                                                      OMRAF*WGT*Q_CON_WALL*WALL(IW)%RAW/DT
+                  WALL(IW)%LP_CPUA(LPC%ARRAY_INDEX) = WALL(IW)%LP_CPUA(LPC%ARRAY_INDEX) + OMRAF*WGT*Q_CON_WALL/(WALL(IW)%AW*DT)
                   WALL(IW)%ONE_D%QRADIN = (WALL(IW)%AW*DT*WALL(IW)%ONE_D%QRADIN - WGT*DT*Q_DOT_RAD)/(WALL(IW)%AW*DT)
                ENDIF
+
             ENDIF BOIL_ALL
+
          ENDIF KILL_RADIUS_CHECK
 
          ! Get out of the loop if the PARTICLE has evaporated completely
+
          IF (LP%ONE_D%X(1)<=LPC%KILL_RADIUS) CYCLE PARTICLE_LOOP
 
          DT_SUM = DT_SUM + DT_SUBSTEP
@@ -2713,7 +2722,7 @@ SUM_PART_QUANTITIES: IF (N_LP_ARRAY_INDICES > 0) THEN
             R_DROP = LP%ONE_D%X(1)
             FTPR   = FOTHPI * LP%ONE_D%RHO(1,1)
             M_DROP = FTPR*R_DROP**3
-            WALL(IW)%LP_MPUA(LPC%ARRAY_INDEX) = WALL(IW)%LP_MPUA(LPC%ARRAY_INDEX) + OMRAF*LP%PWT*M_DROP*WALL(IW)%RAW
+            WALL(IW)%LP_MPUA(LPC%ARRAY_INDEX) = WALL(IW)%LP_MPUA(LPC%ARRAY_INDEX) + OMRAF*LP%PWT*M_DROP/WALL(IW)%AW
          ENDIF
 
       ENDDO PARTICLE_LOOP_2

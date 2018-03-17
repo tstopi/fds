@@ -23,6 +23,8 @@ PROCESS()
   fi
   if [ $nfds -gt 0 ]; then
     echo "$case: cases=$nfds finished=$nout successful=$nsuccess status=$status"
+  else
+    echo "$case: No cases run"
   fi
   cd $curdir
 }
@@ -68,6 +70,7 @@ PROCESS NIST_NRC
 PROCESS NIST_RSE_1994
 PROCESS NIST_RSE_2007
 PROCESS NIST_Smoke_Alarms
+PROCESS NIST_Vent_Study
 PROCESS NRCC_Facade
 PROCESS NRCC_Smoke_Tower
 PROCESS NRL_HAI
