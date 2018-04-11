@@ -293,9 +293,6 @@ INTEGRATION_LOOP: DO TIME_ITER = 1,MAX_CHEMISTRY_SUBSTEPS
                                  CELL_MASS,TAU_MIX,Q_REAC_SUB,TIME_ITER,TOTAL_MIXED_MASS)
          ZETA_0 = ZETA
          ZZ_MIXED = ZZ_MIXED_NEW
-         IF (SIMPLE_CHEMISTRY .AND. N_FIXED_CHEMISTRY_SUBSTEPS<0 .AND. TIME_ITER>1) THEN
-            CALL SHUTDOWN('ERROR: Error in Simple Chemistry')
-         ENDIF
 
       CASE (RK2) ! Runge-Kutta 2 stage (use in combination with N_FIXED_CHEMISTRY_SUBSTEPS)
 
@@ -489,31 +486,36 @@ END SUBROUTINE EXTINCT_1
 
 SUBROUTINE EXTINCT_2(EXTINCT,ZZ_0_IN,ZZ_IN,TMP_IN)
 
-! Default model used with SIMPLE_CHEMISTRY, FDS Tech Guide, Section 5.3
+! Default model, FDS Tech Guide, Section 5.3
 
 USE PHYSICAL_FUNCTIONS, ONLY: GET_ENTHALPY
 REAL(EB),INTENT(IN) :: TMP_IN,ZZ_0_IN(1:N_TRACKED_SPECIES),ZZ_IN(1:N_TRACKED_SPECIES)
 LOGICAL, INTENT(INOUT) :: EXTINCT
-REAL(EB) :: ZZ_HAT_0(1:N_TRACKED_SPECIES),ZZ_HAT(1:N_TRACKED_SPECIES),H_0,H_CRIT
+REAL(EB) :: ZZ_HAT_0(1:N_TRACKED_SPECIES),ZZ_HAT(1:N_TRACKED_SPECIES),H_0,H_CRIT,PHI_TILDE
 INTEGER :: NS
 TYPE(REACTION_TYPE), POINTER :: R1=>NULL()
 
 IF (.NOT.REACTION(1)%FAST_CHEMISTRY) RETURN
 R1 => REACTION(1)
 
-DO NS = 1,N_TRACKED_SPECIES
+PHI_TILDE = (ZZ_0_IN(R1%AIR_SMIX_INDEX) - ZZ_IN(R1%AIR_SMIX_INDEX)) / ZZ_0_IN(R1%AIR_SMIX_INDEX)  ! FDS Tech Guide (5.45)
+
+! Define the modified pre and post mixtures (ZZ_HAT_0 and ZZ_HAT) in which excess air and products are excluded.
+
+DO NS=1,N_TRACKED_SPECIES
    IF (NS==R1%FUEL_SMIX_INDEX) THEN
-      ZZ_HAT_0(NS) = ZZ_0_IN(NS)             ! FDS Tech Guide (5.45)
-      ZZ_HAT(NS)   = ZZ_IN(NS)               ! FDS Tech Guide (5.48)
+      ZZ_HAT_0(NS) = ZZ_0_IN(NS)
+      ZZ_HAT(NS)   = ZZ_IN(NS)
    ELSEIF (NS==R1%AIR_SMIX_INDEX) THEN
-      ZZ_HAT_0(NS) = ZZ_0_IN(NS) - ZZ_IN(NS) ! FDS Tech Guide (5.46)
-      ZZ_HAT(NS)   = 0._EB                   ! FDS Tech Guide (5.49)
-   ELSE
-      ! FDS Tech Guide (5.47)
-      ZZ_HAT_0(NS) = ( (ZZ_0_IN(R1%AIR_SMIX_INDEX) - ZZ_IN(R1%AIR_SMIX_INDEX)) / ZZ_0_IN(R1%AIR_SMIX_INDEX) ) * ZZ_0_IN(NS)
-      ZZ_HAT(NS)   = ZZ_HAT_0(NS) + ZZ_IN(NS) - ZZ_0_IN(NS) ! FDS Tech Guide (5.50)
+      ZZ_HAT_0(NS) = PHI_TILDE * ZZ_0_IN(NS)
+      ZZ_HAT(NS)   = 0._EB
+   ELSE  ! Products
+      ZZ_HAT_0(NS) = PHI_TILDE * ZZ_0_IN(NS)
+      ZZ_HAT(NS)   = (PHI_TILDE-1._EB)*ZZ_0_IN(NS) + ZZ_IN(NS)
    ENDIF
 ENDDO
+
+! Normalize the modified pre and post mixtures
 
 ZZ_HAT_0 = ZZ_HAT_0/SUM(ZZ_HAT_0)
 ZZ_HAT = ZZ_HAT/SUM(ZZ_HAT)
@@ -522,7 +524,7 @@ ZZ_HAT = ZZ_HAT/SUM(ZZ_HAT)
 
 CALL GET_ENTHALPY(ZZ_HAT_0,H_0,TMP_IN) ! H of reactants participating in reaction (includes chemical enthalpy)
 CALL GET_ENTHALPY(ZZ_HAT,H_CRIT,R1%CRIT_FLAME_TMP) ! H of products at the critical flame temperature
-IF (H_0 < H_CRIT) EXTINCT = .TRUE. ! FDS Tech Guide (5.51)
+IF (H_0 < H_CRIT) EXTINCT = .TRUE. ! FDS Tech Guide (5.46)
 
 END SUBROUTINE EXTINCT_2
 

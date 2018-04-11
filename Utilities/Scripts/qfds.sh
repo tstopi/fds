@@ -120,6 +120,7 @@ function usage {
   echo " -t   - used for timing studies, run a job alone on a node (reserving $NCORES_COMPUTENODE cores)"
   echo " -T type - run dv (development) or db (debug) version of fds"
   echo "           if -T is not specified then the release version of fds is used"
+  echo " -V   - show command line used to invoke qfds.sh"
   echo " -w time - walltime, where time is hh:mm for PBS and dd-hh:mm:ss for SLURM. [default: $walltime]"
   echo ""
   exit
@@ -177,6 +178,7 @@ fi
 
 #*** set default parameter values
 
+showcommandline=
 OMPPLACES=$OMP_PLACES
 OMPPROCBIND=$OMP_PROCBIND
 HELP=
@@ -200,12 +202,17 @@ nopenmp_threads=1
 use_installed=
 use_debug=
 use_devel=
-use_intel_mpi=
+use_intel_mpi=1
+nosocket="1"
+# the mac doesn't have Intel MPI
+if [ "`uname`" == "Darwin" ]; then
+  use_intel_mpi=
+  nosocket=
+fi
 dir=.
 benchmark=no
 showinput=0
 REPORT_BINDINGS="--report-bindings"
-nosocket=
 exe=
 STARTUP=
 if [ "$QFDS_STARTUP" != "" ]; then
@@ -226,9 +233,11 @@ if [ "$BACKGROUND_LOAD" == "" ]; then
    BACKGROUND_LOAD=75
 fi
 
+commandline=`echo $* | sed 's/-V//' | sed 's/-v//'`
+
 #*** read in parameters from command line
 
-while getopts 'ACd:e:Ef:hHiIm:MNn:o:O:p:Pq:rsStT:vw:' OPTION
+while getopts 'ACd:e:Ef:hHiILm:MNn:o:O:p:Pq:rsStT:vVw:' OPTION
 do
 case $OPTION  in
   A) # used by timing scripts to identify benchmark cases
@@ -264,6 +273,10 @@ case $OPTION  in
   I)
    use_intel_mpi=1
    nosocket="1"
+   ;;
+  L)
+   use_intel_mpi=
+   nosocket=
    ;;
   M)
    MCA="--mca plm_rsh_agent /usr/bin/ssh "
@@ -335,12 +348,20 @@ case $OPTION  in
   v)
    showinput=1
    ;;
+  V)
+   showcommandline=1
+   ;;
   w)
    walltime="$OPTARG"
    ;;
 esac
 done
 shift $(($OPTIND-1))
+
+if [ "$showcommandline" == "1" ]; then
+  echo $0 $commandline
+  exit
+fi
 
 #*** define input file
 
@@ -674,6 +695,7 @@ scriptfile=`mktemp /tmp/script.$$.XXXXXX`
 
 cat << EOF > $scriptfile
 #!/bin/bash
+# $0 $commandline
 EOF
 
 if [ "$queue" != "none" ]; then
@@ -797,6 +819,7 @@ fi
 
 if [ "$showinput" == "1" ]; then
   cat $scriptfile
+  echo
   exit
 fi
 
