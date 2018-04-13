@@ -445,9 +445,11 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
       IF (ATMOSPHERIC_INTERPOLATION) THEN
          ! interp or extrap RHO_OTHER for jump in vertical grid resolution, linear in temperature to match heat flux in divg
          PBAR_G = PBAR_P(KKG,ONE_D%PRESSURE_ZONE)
-         PBAR_OTHER = MM%PBAR(EWC%KKO_MIN,ONE_D%PRESSURE_ZONE)
-         DENOM = PBAR_G/ONE_D%RHO_G + DDO*(PBAR_OTHER/RHO_OTHER - PBAR_G/ONE_D%RHO_G)
-         RHOP(II,JJ,KK) = PBAR_P(KK,ONE_D%PRESSURE_ZONE)/DENOM
+         PBAR_OTHER = EVALUATE_RAMP(MM%ZC(EWC%KKO_MIN),DUMMY,I_RAMP_P0_Z)
+         ZZ_GET(1:N_TRACKED_SPECIES) = MAX(0._EB,MIN(1._EB,RHO_ZZ_OTHER(1:N_TOTAL_SCALARS)/RHO_OTHER))
+         CALL GET_SPECIFIC_GAS_CONSTANT(ZZ_GET,RSUM(II,JJ,KK))
+         DENOM = PBAR_G/ONE_D%RHO_G/ONE_D%RSUM_G + DDO*(PBAR_OTHER/RHO_OTHER/RSUM(II,JJ,KK) - PBAR_G/ONE_D%RHO_G/ONE_D%RSUM_G)
+         RHOP(II,JJ,KK) = PBAR_P(KK,ONE_D%PRESSURE_ZONE)/RSUM(II,JJ,KK)/DENOM
       ELSE
          RHOP(II,JJ,KK) = RHO_OTHER
       ENDIF
@@ -991,10 +993,10 @@ SUBSTEP_LOOP: DO WHILE ( ABS(T_LOC-DT_BC_HT3D)>TWO_EPSILON_EB )
                         ENDIF
                         IF (ABS(FDERIV) > TWO_EPSILON_EB) TMP_OTHER = TMP_OTHER - QEXTRA / FDERIV
                         IF (ABS(TMP_OTHER - TMP_F) / TMP_F < 1.E-4_EB .OR. ADCOUNT > 20) THEN
-                           TMP_F = MIN(TMPMAX,TMP_OTHER)
+                           TMP_F = MAX(TMPMIN,MIN(TMPMAX,TMP_OTHER))
                            EXIT ADLOOP
                         ELSE
-                           TMP_F = MIN(TMPMAX,TMP_OTHER)
+                           TMP_F = MAX(TMPMIN,MIN(TMPMAX,TMP_OTHER))
                            CYCLE ADLOOP
                         ENDIF
                      ENDDO ADLOOP
@@ -1143,12 +1145,22 @@ INIT_IF: IF (T_LOC<TWO_EPSILON_EB) THEN
             I_LOOP: DO I=OB%I1+1,OB%I2
                IC = CELL_INDEX(I,J,K)
                IF (.NOT.SOLID(IC)) CYCLE I_LOOP
-               WC=>WALL(WALL_INDEX_HT3D(IC,OB%PYRO3D_IOR))
-               IF (WC%BOUNDARY_TYPE==NULL_BOUNDARY) CYCLE I_LOOP
-               SF=>SURFACE(WC%SURF_INDEX)
-               WC%ONE_D%MASSFLUX(1:N_TRACKED_SPECIES)      = 0._EB
-               WC%ONE_D%MASSFLUX_SPEC(1:N_TRACKED_SPECIES) = 0._EB
-               WC%ONE_D%MASSFLUX_MATL(1:SF%N_MATL)         = 0._EB
+               IOR_SELECT: SELECT CASE(OB%PYRO3D_IOR)
+                  CASE DEFAULT
+                     WC=>WALL(WALL_INDEX_HT3D(IC,OB%PYRO3D_IOR))
+                     SF=>SURFACE(WC%SURF_INDEX)
+                     WC%ONE_D%MASSFLUX(1:N_TRACKED_SPECIES)      = 0._EB
+                     WC%ONE_D%MASSFLUX_SPEC(1:N_TRACKED_SPECIES) = 0._EB
+                     WC%ONE_D%MASSFLUX_MATL(1:SF%N_MATL)         = 0._EB
+                  CASE(0)
+                     DO IOR=-3,3
+                        WC=>WALL(WALL_INDEX_HT3D(IC,IOR))
+                        SF=>SURFACE(WC%SURF_INDEX)
+                        WC%ONE_D%MASSFLUX(1:N_TRACKED_SPECIES)      = 0._EB
+                        WC%ONE_D%MASSFLUX_SPEC(1:N_TRACKED_SPECIES) = 0._EB
+                        WC%ONE_D%MASSFLUX_MATL(1:SF%N_MATL)         = 0._EB
+                     ENDDO
+               END SELECT IOR_SELECT
             ENDDO I_LOOP
          ENDDO
       ENDDO
@@ -1176,6 +1188,7 @@ OBST_LOOP_2: DO N=1,N_OBST
             KKG = WC%ONE_D%KKG
             IOR = WC%ONE_D%IOR
             TMP_S = TMP(I,J,K)
+
             SELECT CASE(ABS(IOR))
                CASE(1); GEOM_FACTOR = DX(I)
                CASE(2); GEOM_FACTOR = DY(J)
@@ -1197,7 +1210,7 @@ OBST_LOOP_2: DO N=1,N_OBST
                            RHO_OUT(1:MS%N_MATL),MS%LAYER_DENSITY(1),DUMMY,DT_SUB,&
                            M_DOT_G_PPP_ADJUST,M_DOT_G_PPP_ACTUAL,M_DOT_S_PPP,Q_DOT_PPP_S(I,J,K))
 
-            OB%RHO(I,J,K,1:MS%N_MATL) = OB%RHO(I,J,K,1:MS%N_MATL) + RHO_OUT(1:MS%N_MATL)-RHO_IN(1:MS%N_MATL)
+            OB%RHO(I,J,K,1:MS%N_MATL) = OB%RHO(I,J,K,1:MS%N_MATL) + RHO_OUT(1:MS%N_MATL) - RHO_IN(1:MS%N_MATL)
 
             ! simple model (no transport): pyrolyzed mass is ejected via wall cell index WALL_INDEX_HT3D(IC,OB%PYRO3D_IOR)
 

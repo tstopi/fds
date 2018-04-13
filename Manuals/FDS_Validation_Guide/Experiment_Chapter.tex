@@ -43,7 +43,58 @@ A common validation experiment for CFD codes involves flow through a channel wit
 \section{Beyler Hood Experiments}
 \label{Beyler_Hood_Description}
 
-Craig Beyler performed a large number of experiments involving a variety of fuels, fire sizes, burner diameters, and burner distances beneath a hood~\cite{Beyler:Hood}.  The hood consisted of concentric cylinders separated by an air gap.  The inner cylinder was shorter than the outer and this allowed combustion products to be removed uniformly from the hood perimeter.  The exhaust gases were then analyzed to determine species concentrations. The burner could be raised and lowered with respect to the bottom edge of the hood.  Based on the published measurement uncertainties, species errors are estimated at 6~\%.  148 tests were performed with measurements made in the exhaust duct.  The fuels in those tests were as follows: 16 acetone, 11 ethanol, 13 isopropanol, 18 methanol, 51 propane, 28 propylene, and 11 toluene. Hood equivalence ratios varied from 0.2 to 1.7.  A subset of 47 tests spanning the equivalence ratio range for each fuel was simulated for validation (5, 5, 5, 5, 15, 7, and 5 respectively for the fuels mentioned above).
+Craig Beyler performed small-scale fire experiments where a gas burner was positioned at various heights underneath a closed, cylindrical hood, 100~cm in diameter and 48~cm in height~\cite{Beyler:Hood}.  The hood consisted of two concentric cylinders separated by an air gap, as shown in Fig.~\ref{Beyler_Hood_Sketch}.  The inner cylinder was shorter than the outer and this allowed combustion products to be removed uniformly from the hood perimeter.  The exhaust gases were then analyzed to determine species concentrations. The burner could be raised and lowered with respect to the bottom edge of the hood. The reported relative standard uncertainty of the measured gas species mass fractions was 6~\%. The fuels consisted of acetone, ethanol, isopropanol, methanol, propane, propylene, and toluene. Hood equivalence ratios varied from 0.2 to 1.7.  A subset of 47 of the original 148 experiments spanning the equivalence ratio range for each fuel were simulated for validation, see Table~\ref{beyler_sum}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{FIGURES/Beyler_Hood/Beyler_Hood}
+\caption[Sketch of Beyler Hood cross section]{Sketch of Beyler Hood cross section.}
+\label{Beyler_Hood_Sketch}
+\end{figure}
+
+\begin{table}[!ht]
+\centering
+\caption[Summary of simulated Beyler Hood experiments]{Summary of simulated Beyler Hood experiments. A negative value of Separation Distance indicates the burner top is below the lower rim of the hood.}
+\label{beyler_sum}
+\begin{tabular}{|c|c|c|c|c||c|c|c|c|c|}
+\hline
+Exp.   & Fuel          & HRR      & Burner           & Sep.           &  Exp.   & Fuel          & HRR      & Burner           & Sep.            \\
+No.    & Gas           & (kW)     & (cm)             & Dist. (cm)     &  No.    & Gas           & (kW)     & (cm)             & Dist. (cm)      \\ \hline \hline
+117    & Acetone       & 18.0     & 22.6             & -12            &  232    & Propane       & 13.5     & 19.5             & -5              \\ \hline
+119    & Acetone       & 16.4     & 22.6             & -1             &  257    & Propane       & 8.2      & 19.5             & -15             \\ \hline
+122    & Acetone       & 16.4     & 22.6             & 4              &  287    & Propane       & 7.9      & 19.5             & 5               \\ \hline
+142    & Acetone       & 12.1     & 22.6             & 4              &  303    & Propane       & 18.3     & 19.5             & 5               \\ \hline
+145    & Acetone       & 12.7     & 22.6             & 4              &  307    & Propane       & 21.4     & 19.5             & 5               \\ \hline
+106    & Ethanol       & 17.3     & 22.6             & -9             &  318    & Propane       & 18.3     & 19.5             & -20             \\ \hline
+107    & Ethanol       & 21.3     & 22.6             & -4             &  322    & Propane       & 21.4     & 19.5             & -20             \\ \hline
+108    & Ethanol       & 17.3     & 22.6             & 4              &  334    & Propane       & 21.4     & 19.5             & -15             \\ \hline
+110    & Ethanol       & 13.5     & 22.6             & 4              &  355    & Propane       & 18.3     & 19.5             & 0               \\ \hline
+115    & Ethanol       & 13.5     & 22.6             & 4              &  359    & Propane       & 21.4     & 19.5             & 0               \\ \hline
+130    & Isopropanol   & 12.4     & 22.6             & 4              &  371    & Propane       & 21.4     & 19.5             & -5              \\ \hline
+132    & Isopropanol   & 12.4     & 22.6             & 4              &  389    & Propane       & 18.3     & 19.5             & 0               \\ \hline
+133    & Isopropanol   & 12.4     & 22.6             & 4              &  429    & Propane       & 28.1     & 19.5             & -10             \\ \hline
+136    & Isopropanol   & 12.4     & 22.6             & -1             &  433    & Propane       & 31.5     & 19.5             & -10             \\ \hline
+141    & Isopropanol   & 12.4     & 22.6             & 4              &  445    & Propane       & 31.5     & 19.5             & -15             \\ \hline
+942    & Methanol      & 11.0     & 22.6             & 0              &  780    & Propylene     & 7.5      & 19.5             & -10             \\ \hline
+943    & Methanol      & 11.0     & 22.6             & 0              &  805    & Propylene     & 7.5      & 19.5             & -10             \\ \hline
+945    & Methanol      & 11.0     & 22.6             & -5             &  859    & Propylene     & 31.4     & 19.5             & -10             \\ \hline
+947    & Methanol      & 11.0     & 22.6             & 0              &  870    & Propylene     & 19.0     & 19.5             & -2              \\ \hline
+951    & Methanol      & 9.8      & 22.6             & 0              &  882    & Propylene     & 19.1     & 19.5             & -10             \\ \hline
+160    & Toluene       & 11.5     & 22.6             & -6             &  886    & Propylene     & 19.1     & 19.5             & -5              \\ \hline
+162    & Toluene       & 11.5     & 22.6             & -1             &  910    & Propylene     & 31.4     & 19.5             & -11             \\ \hline 
+165    & Toluene       & 11.5     & 22.6             & 4              &  \multicolumn{5}{c|}{}                                                  \\ \cline{1-5}
+166    & Toluene       & 11.5     & 22.6             & 5              &  \multicolumn{5}{c|}{}                                                  \\ \cline{1-5}
+170    & Toluene       & 11.5     & 22.6             & 4              &  \multicolumn{5}{c|}{}                                                  \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Modeling Notes}
+
+Simulations of the Beyler Hood experiments are performed at 3~cm resolution within a fairly simple facsimile of the actual hood. The boundary conditions are set to adiabatic to allow for a relatively quick ramp up to steady-state conditions. 
+
+The two-step simple chemistry combustion scheme is applied, where an infinitely fast reaction converts the fuel to CO, soot, and water vapor, followed sequentially by a second fast reaction that converts the soot and CO to CO$_2$. Some of the soot and CO does not convert to CO$_2$, based on post-flame yields listed by Tewarson~\cite{SFPE:Tewarson}.
+
+A minimum auto-ignition temperature is specified for each fuel~\cite{SFPE:Beyler} to prevent the fuel vapor from igniting at the layer interface. This restriction is relaxed in the grid cells just above the burner surface to allow for ignition without a secondary heat source. In addition, a critical flame temperature of 500~$^\circ$C is applied in all cases to account for local flame extinction. The grid is too coarse to support the actual values, and the chosen value is a placeholder until a better flame extinction model is developed.
 
 
 \section{Bittern Sprinkler Experiments}
@@ -563,10 +614,15 @@ In 2009, Mell et~al. measured the burning rate of individual Douglas fir trees o
 
 A variety of reduced-scale and full-scale compartment fire experiments have been performed at NIST over the past few decades. The main objective of each series is to measure the concentrations of oxygen, carbon dioxide, carbon monoxide, soot, and unburned hydrocarbons in an under-ventilated compartment. These data sets also provide extreme temperature and heat flux measurements.
 
+
+
+
+
+
 \subsection{NIST Reduced Scale Enclosure Experiments, 1994}
 \label{NIST_RSE_1994_Description}
 
-The NIST Reduced Scale Enclosure (RSE) is a 40~\% scale version of the ISO~9705 compartment~\cite{Bryner:1}. It measures 0.98 m wide by 1.46 m deep by 0.98 m tall.  The compartment contains a door centered on the smaller wall that measures 0.48~m wide by 0.81 m tall.  A 15~cm diameter natural gas burner was positioned in the center of the compartment.  The burner was on a stand so that its top was 15~cm above the floor. The fires ranged from 50~kW to 600~kW. Species measurements, including CO concentration, were made near the ceiling in the front and back of the compartment.
+The NIST Reduced Scale Enclosure (RSE) was a 40~\% scale version of the ISO~9705 compartment~\cite{Bryner:1}. It measured 0.98~m wide by 1.46~m deep by 0.98~m tall. A door, centered on the smaller wall, was 0.48~m wide by 0.81~m tall.  A 15~cm diameter natural gas burner was positioned in the center of the compartment.  The burner was on a stand so that its top was 15~cm above the floor. The fires ranged from 50~kW to 600~kW. Species measurements, including CO concentration, were made near the ceiling in the front and back of the compartment.
 
 \subsection{NIST Reduced Scale Enclosure Experiments, 2007}
 \label{NIST_RSE_2007_Description}
@@ -576,22 +632,22 @@ Another set of reduced-scale compartment experiments was conducted in 2007 at NI
 \begin{table}[!ht]
 \caption{Summary of NIST Reduced-Scale Experiments, 2007.}
 \begin{center}
-\begin{tabular}{|l|l|c|c|c|}
+\begin{tabular}{|c|c|c|c|c|c|}
 \hline
-Test   &  Fuel         &  Peak        &  Burner       &  Doorway          \\
-Number &  Type         &  HRR (kW)    &  Size (m$^2$) &  Opening (cm)     \\ \hline \hline
-1      &  Natural Gas  &  190         &  0.017        &  48               \\ \hline
-2      &  Natural Gas  &  395         &  0.017        &  48               \\ \hline
-3      &  Natural Gas  &  410         &  0.017        &  48               \\ \hline
-4      &  Heptane      &  375         &  0.063        &  48               \\ \hline
-5      &  Heptane      &  220         &  0.063        &  24               \\ \hline
-6      &  Natural Gas  &  420         &  0.063        &  24               \\ \hline
-7      &  Heptane      &  340         &  0.063        &  48               \\ \hline
-10     &  Toluene      &  340         &  0.063        &  48               \\ \hline
-11     &  Ethanol      &  335         &  0.126        &  48               \\ \hline
-12     &  Methanol     &  305         &  0.126        &  48               \\ \hline
-15     &  Heptane      &  375         &  0.126        &  48               \\ \hline
-16     &  Polystyrene  &  360         &  0.283        &  48               \\ \hline
+Test   &  Fuel         &  Fuel           & Peak        &  Burner       &  Doorway          \\
+No.    &  Type         &  Formula        & HRR (kW)    &  Size (m$^2$) &  Opening (cm)     \\ \hline \hline
+1      &  Natural Gas  &  CH$_4$         & 190         &  0.017        &  48               \\ \hline
+2      &  Natural Gas  &  CH$_4$         & 395         &  0.017        &  48               \\ \hline
+3      &  Natural Gas  &  CH$_4$         & 410         &  0.017        &  48               \\ \hline
+4      &  Heptane      &  C$_7$H$_{16}$  & 375         &  0.063        &  48               \\ \hline
+5      &  Heptane      &  C$_7$H$_{16}$  & 220         &  0.063        &  24               \\ \hline
+6      &  Natural Gas  &  CH$_4$         & 420         &  0.063        &  24               \\ \hline
+7      &  Heptane      &  C$_7$H$_{16}$  & 340         &  0.063        &  48               \\ \hline
+10     &  Toluene      &  C$_7$H$_8$     & 340         &  0.063        &  48               \\ \hline
+11     &  Ethanol      &  C$_2$H$_6$O    & 335         &  0.126        &  48               \\ \hline
+12     &  Methanol     &  CH$_4$O        & 305         &  0.126        &  48               \\ \hline
+15     &  Heptane      &  C$_7$H$_{16}$  & 375         &  0.126        &  48               \\ \hline
+16     &  Polystyrene  &  C$_8$H$_8$     & 360         &  0.283        &  48               \\ \hline
 \end{tabular}
 \end{center}
 \label{tab:NIST_RSE_Exp}
@@ -601,7 +657,11 @@ Number &  Type         &  HRR (kW)    &  Size (m$^2$) &  Opening (cm)     \\ \hl
 \subsection{NIST Full-Scale Enclosure Experiments, 2008}
 \label{NIST_FSE_2008_Description}
 
-The NIST FSE (2008) Experiments were conducted in an ISO~9705 compartment~\cite{Lock:1}. The compartment was 2.4~m wide by 3.6~m long by 2.4~m high with a 2~m high door at one end (Fig.~\ref{NIST_FSE_2008_Drawing}). The door width varied between 0.1~m and 0.8~m. The experiments were designed to study the effects of fuel type, fuel distribution, and vent size on under-ventilated compartment fires. Thirty experiments were conducted, which included 7 different fuels, 3 fuel sources, and 4 ventilation openings. Table~\ref{tab:NIST_FSE_Exp} provides a summary of the experiments. Species concentrations and temperature measurements were made at the front and rear of the compartment.
+The NIST FSE (2008) Experiments were conducted in an ISO~9705 compartment~\cite{Lock:1}. The compartment was 2.4~m wide by 3.6~m long by 2.4~m high with a 2~m high door at one end (Fig.~\ref{NIST_FSE_2008_Drawing}). The door width varied between 0.1~m and 0.8~m. The experiments were designed to study the effects of fuel type, fuel distribution, and vent size on under-ventilated compartment fires. Twenty-seven of the thirty experiments were simulated, which included 7 different fuels, 3 fuel sources, and 4 ventilation openings. The three experiments not simulated had several malfunctions of equipment such that the data could not be trusted.
+
+Peak heat release rates ranged from approximately 100~kW to 2.5~MW. Table~\ref{tab:NIST_FSE_Exp} provides a summary of the experiments. Species concentrations and temperature measurements were made at the front and rear of the compartment.
+
+
 
 \begin{figure}[!ht]
 \includegraphics[width=\textwidth]{FIGURES/NIST_FSE_2008/NIST_FSE_2008_Drawing}
@@ -612,41 +672,49 @@ The NIST FSE (2008) Experiments were conducted in an ISO~9705 compartment~\cite{
 \begin{table}[!ht]
 \caption{Summary of NIST FSE Experiments selected for model validation.}
 \begin{center}
-\begin{tabular}{|l|l|c|c|c|c|}
+\begin{tabular}{|l|l|c|c|c|c|c|}
 \hline
-Test          &  Fuel         &  Fuel      &  No.~of   &  Burner       &  Doorway          \\
-Name          &  Type         &  Mass (kg) &  Burners  &  Size (m$^2$) &  Opening (cm)     \\ \hline \hline
-ISONG3        &  Natural Gas  &            &  1        &  1.0          &  80               \\ \hline
-ISOHept4      &  Heptane      &  Pool Fed  &  1        &  1.0          &  80               \\ \hline
-ISOHept5      &  Heptane      &  Pool Fed  &  1        &  1.0          &  40               \\ \hline
-ISOHept8      &  Heptane      &  10        &  1        &  0.5          &  20               \\ \hline
-ISOHept9      &  Heptane      &  20        &  1        &  0.5          &  20               \\ \hline
-ISONylon10    &  Nylon        &  10        &  1        &  0.5          &  20               \\ \hline
-ISOPP11       &  Propylene    &  10        &  1        &  0.5          &  20               \\ \hline
-ISOHeptD12    &  Heptane      &  20        &  2        &  0.25         &  20               \\ \hline
-ISOHeptD13    &  Heptane      &  20        &  2        &  0.25         &  20               \\ \hline
-ISOPropD14    &  Propanol     &  24        &  2        &  0.25         &  20               \\ \hline
-ISOProp15     &  Propanol     &  24        &  1        &  0.5          &  20               \\ \hline
-ISOStyrene16  &  Styrene      &  10        &  1        &  0.5          &  20               \\ \hline
-ISOStyrene17  &  Styrene      &  30        &  1        &  1.0          &  20               \\ \hline
-ISOPP18       &  Propylene    &  20        &  2        &  0.5          &  20               \\ \hline
-ISOHept19     &  Heptane      &  20        &  1        &  0.5          &  20               \\ \hline
-ISOToluene20  &  Toluene      &  17        &  1        &  0.5          &  20               \\ \hline
-ISOStyrene21  &  Styrene      &  15        &  1        &  0.5          &  20               \\ \hline
-ISOHept22     &  Heptane      &  Spray     &  1        &  0.5          &  20               \\ \hline
-ISOHept23     &  Heptane      &  Spray     &  1        &  0.5          &  10               \\ \hline
-ISOHept24     &  Heptane      &  Spray     &  1        &  0.5          &  10               \\ \hline
-ISOHept25     &  Heptane      &  Spray     &  1        &  0.5          &  40               \\ \hline
-ISOHept26     &  Heptane      &  Spray     &  1        &  0.5          &  40               \\ \hline
-ISOHept27     &  Heptane      &  Spray     &  1        &  0.5          &  10               \\ \hline
-ISOHept28     &  Heptane      &  Spray     &  1        &  0.5          &  20               \\ \hline
-ISOToluene29  &  Toluene      &  Spray     &  1        &  0.5          &  20               \\ \hline
-ISOPropanol30 &  Propanol     &  Spray     &  1        &  0.5          &  20               \\ \hline
-ISONG32       &  Natural Gas  &            &  1        &  0.28         &  20               \\ \hline
+Test          &  Fuel         &  Fuel             &  Fuel      &  No.~of   &  Burner       &  Doorway          \\
+Name          &  Type         &  Formula          &  Mass (kg) &  Burners  &  Size (m$^2$) &  Opening (cm)     \\ \hline \hline
+ISONG3        &  Natural Gas  &  CH$_4$           &            &  1        &  1.0          &  80               \\ \hline
+ISOHept4      &  Heptane      &  C$_7$H$_{16}$    &  Pool Fed  &  1        &  1.0          &  80               \\ \hline
+ISOHept5      &  Heptane      &  C$_7$H$_{16}$    &  Pool Fed  &  1        &  1.0          &  40               \\ \hline
+ISOHept8      &  Heptane      &  C$_7$H$_{16}$    &  10        &  1        &  0.5          &  20               \\ \hline
+ISOHept9      &  Heptane      &  C$_7$H$_{16}$    &  20        &  1        &  0.5          &  20               \\ \hline
+ISONylon10    &  Nylon        &  C$_6$H$_{11}$NO  &  10        &  1        &  0.5          &  20               \\ \hline
+ISOPP11       &  Propylene    &  C$_3$H$_6$       &  10        &  1        &  0.5          &  20               \\ \hline
+ISOHeptD12    &  Heptane      &  C$_7$H$_{16}$    &  20        &  2        &  0.25         &  20               \\ \hline
+ISOHeptD13    &  Heptane      &  C$_7$H$_{16}$    &  20        &  2        &  0.25         &  20               \\ \hline
+ISOPropD14    &  Propanol     &  C$_3$H$_8$O      &  24        &  2        &  0.25         &  20               \\ \hline
+ISOProp15     &  Propanol     &  C$_3$H$_8$O      &  24        &  1        &  0.5          &  20               \\ \hline
+ISOStyrene16  &  Styrene      &  C$_8$H$_8$       &  10        &  1        &  0.5          &  20               \\ \hline
+ISOStyrene17  &  Styrene      &  C$_8$H$_8$       &  30        &  1        &  1.0          &  20               \\ \hline
+ISOPP18       &  Propylene    &  C$_3$H$_6$       &  20        &  2        &  0.5          &  20               \\ \hline
+ISOHept19     &  Heptane      &  C$_7$H$_{16}$    &  20        &  1        &  0.5          &  20               \\ \hline
+ISOToluene20  &  Toluene      &  C$_7$H$_8$       &  17        &  1        &  0.5          &  20               \\ \hline
+ISOStyrene21  &  Styrene      &  C$_8$H$_8$       &  15        &  1        &  0.5          &  20               \\ \hline
+ISOHept22     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  20               \\ \hline
+ISOHept23     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  10               \\ \hline
+ISOHept24     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  10               \\ \hline
+ISOHept25     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  40               \\ \hline
+ISOHept26     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  40               \\ \hline
+ISOHept27     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  10               \\ \hline
+ISOHept28     &  Heptane      &  C$_7$H$_{16}$    &  Spray     &  1        &  0.5          &  20               \\ \hline
+ISOToluene29  &  Toluene      &  C$_7$H$_8$       &  Spray     &  1        &  0.5          &  20               \\ \hline
+ISOPropanol30 &  Propanol     &  C$_3$H$_8$O      &  Spray     &  1        &  0.5          &  20               \\ \hline
+ISONG32       &  Natural Gas  &  CH$_4$           &            &  1        &  0.28         &  20               \\ \hline
 \end{tabular}
 \end{center}
 \label{tab:NIST_FSE_Exp}
 \end{table}
+
+\subsection{Modeling Notes}
+
+In the simulations of all of the NIST enclosure experiments, it is assumed that the combustion can be simplified to two fast reactions, the first converting fuel to CO and soot, and the second converting CO and soot to CO$_2$. By default, 2/3 of the carbon in the fuel is converted to CO in the first step, the remaining 1/3 to soot. The heats of combustion for the reactions are calculated directly from the heats of formation of the individual molecules. For cases where the fuel molecule is not pre-defined in FDS (e.g., styrene), the fuel's enthalpy of formation is specified. For cases where the fuel's enthalpy of formation is not known (e.g. nylon), the heat of combustion that is reported for complete combustion is specified in a single reaction test case, from which an effective enthalpy of formation is reported\footnote{The FDS diagnostic output (.out) file contains detailed information about the reaction stoichiometry, heats of combustion, and enthalpies of formation.} and then used in the actual two-step reaction scheme.
+
+In the experiments, the heat release rate was measured via oxygen consumption calorimetry. In the simulations, the mass loss rate of fuel was specified by taking the measured HRR and dividing by the heats of combustion listed in Ref.~\cite{SFPE:Tewarson}.
+
+In all simulations, the model geometry included the compartment interior plus a comparable volume at the exterior to allow for a natural flow into and out of the compartment.
 
 
 \FloatBarrier
