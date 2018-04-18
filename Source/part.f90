@@ -1246,7 +1246,7 @@ TYPE (SURFACE_TYPE), POINTER :: SF
 REAL(EB), POINTER, DIMENSION(:,:,:) :: NDPC=>NULL()
 REAL(EB), PARAMETER :: ONTHHALF=0.5_EB**ONTH, B_1=1.7321_EB
 REAL(EB), PARAMETER :: SURFACE_PARTICLE_DIAMETER=0.001_EB ! All PARTICLEs adjusted to this size when on solid (m)
-
+REAL(EB), DIMENSION(3,3) :: B = 0._EB
 CALL POINT_TO_MESH(NM)
 
 ! Determine the Number of Particles (Droplets) Per Cell (NDPC)
@@ -1784,6 +1784,8 @@ PARTICLE_NON_STATIC_IF: IF (.NOT.LPC%STATIC) THEN ! Move airborne, non-stationar
    IF(LPC%TURBULENT_DISPERSION) THEN
      DELTA = LES_FILTER_WIDTH_FUNCTION(DX(IIG_OLD),DY(JJG_OLD),DZ(KKG_OLD))
      K_SGS = (MU(IIG_OLD,JJG_OLD,KKG_OLD)/(RHO(IIG_OLD,JJG_OLD,KKG_OLD)*C_DEARDORFF*DELTA))**2
+     ! Anisotropic extension
+     CALL DIFFUSION_TENSOR(IIG_OLD,JJG_OLD,KKG_OLD,K_SGS,DELTA,B)
      TAU_P = 2._EB*LP%MASS/(RHO_G*A_DRAG*QREL*C_DRAG)
      TAU_T = TAU_P**1.6/(DELTA/SQRT(K_SGS))**0.6
      !TAU_T = DELTA**ONTH/SQRT(K_SGS)
@@ -1792,9 +1794,9 @@ PARTICLE_NON_STATIC_IF: IF (.NOT.LPC%STATIC) THEN ! Move airborne, non-stationar
      CALL BOX_MULLER(DW_X,DW_Y)
      CALL BOX_MULLER(DW_Z,DW_X)
      ! WRITE(LU_ERR,*) K_SGS,TAU_P,TAU_T
-     LP%U = LP%U + DD*DW_X
-     LP%V = LP%V + DD*DW_Y
-     LP%W = LP%W + DD*DW_Z
+     LP%U = LP%U + DD*(B(1,1)*DW_X + B(1,2)*DW_Y + B(1,3)*DW_Z)
+     LP%V = LP%V + DD*(B(2,1)*DW_X + B(2,2)*DW_Y + B(2,3)*DW_Z)
+     LP%W = LP%W + DD*(B(3,1)*DW_X + B(3,2)*DW_Y + B(3,3)*DW_Z)
    ENDIF
    ! gravitational acceleration terms
 
@@ -1866,6 +1868,44 @@ ENDIF PARTICLE_NON_STATIC_IF
 
 END SUBROUTINE MOVE_IN_GAS
 
+SUBROUTINE DIFFUSION_TENSOR(I,J,K,KSGS,DELTA,B)
+INTEGER,INTENT(IN):: I,J,K
+REAL(EB),DIMENSION(3,3),INTENT(OUT)::B
+REAL(EB),INTENT(IN):: KSGS,DELTA
+REAL(EB):: DUDX,DVDY,DWDZ,DUDY,DUDZ,DVDX,DVDZ,DWDX,DWDY
+REAL(EB):: S11,S22,S33,S12,S13,S23,ONTHDIV,NU
+
+DUDX = RDX(I)*(U(I,J,K)-U(I-1,J,K))
+DVDY = RDY(J)*(V(I,J,K)-V(I,J-1,K))
+DWDZ = RDZ(K)*(W(I,J,K)-W(I,J,K-1))
+DUDY = 0.25_EB*RDY(J)*(U(I,J+1,K)-U(I,J-1,K)+U(I-1,J+1,K)-U(I-1,J-1,K))
+DUDZ = 0.25_EB*RDZ(K)*(U(I,J,K+1)-U(I,J,K-1)+U(I-1,J,K+1)-U(I-1,J,K-1))
+DVDX = 0.25_EB*RDX(I)*(V(I+1,J,K)-V(I-1,J,K)+V(I+1,J-1,K)-V(I-1,J-1,K))
+DVDZ = 0.25_EB*RDZ(K)*(V(I,J,K+1)-V(I,J,K-1)+V(I,J-1,K+1)-V(I,J-1,K-1))
+DWDX = 0.25_EB*RDX(I)*(W(I+1,J,K)-W(I-1,J,K)+W(I+1,J,K-1)-W(I-1,J,K-1))
+DWDY = 0.25_EB*RDY(J)*(W(I,J+1,K)-W(I,J-1,K)+W(I,J+1,K-1)-W(I,J-1,K-1))
+ONTHDIV = ONTH*(DUDX+DVDY+DWDZ)
+S11 = DUDX - ONTHDIV
+S22 = DVDY - ONTHDIV
+S33 = DWDZ - ONTHDIV
+S12 = 0.5_EB*(DUDY+DVDX)
+S13 = 0.5_EB*(DUDZ+DWDX)
+S23 = 0.5_EB*(DVDZ+DWDY)
+NU = C_DEARDORFF*DELTA*SQRT(KSGS)
+
+B(1,1) =  TWTH*KSGS-2._EB*NU*S11
+B(2,2) =  TWTH*KSGS-2._EB*NU*S22
+B(3,3) =  TWTH*KSGS-2._EB*NU*S33
+B(2,1) =  -2._EB*NU*S12
+B(1,2) =  -2._EB*NU*S12
+B(1,3) =  -2._EB*NU*S13
+B(3,1) =  -2._EB*NU*S13
+B(2,3) =  -2._EB*NU*S23
+B(3,2) =  -2._EB*NU*S23
+B=B/KSGS
+
+
+END SUBROUTINE DIFFUSION_TENSOR
 
 SUBROUTINE WAKE_REDUCTION(DROP_VOL_FRAC,RE,C_DRAG,WAKE_VEL)
 
@@ -2920,6 +2960,246 @@ MESHES(NM)%LAGRANGIAN_PARTICLE(LP_INDEX) = MESHES(NM)%LAGRANGIAN_PARTICLE(NLP)
 MESHES(NM)%LAGRANGIAN_PARTICLE(LP_INDEX)%ARRAY_INDEX = LP_INDEX
 
 END SUBROUTINE REMOVE_OLDEST_PARTICLE
+
+! McDermott
+! 4/23/2007
+!
+! Parabolic Edge Reconstruction Method (PERM) in 3D
+
+SUBROUTINE perm3d(u,v,w,q,r,s,nc,ubar,d1,d2,div)
+
+    IMPLICIT NONE
+
+    ! Dimension variables
+
+    INTEGER, INTENT(in) :: nc                   ! number of particles in the cell
+    REAL, INTENT(in) :: q(nc),r(nc),s(nc)       ! (q,r,s) position of particles
+    REAL, INTENT(in) :: ubar(12),d1(12),d2(12)  ! parabolic edge parameters
+    REAL, INTENT(out) :: u(nc),v(nc),w(nc)      ! reconstructed velocity
+    REAL, INTENT(out) :: div(nc)
+
+    ! Local
+    INTEGER :: i
+    REAL :: q1,q2,r1,r2,s1,s2
+    REAL :: dudx,dvdy,dwdz
+
+
+    !============================================================
+    
+
+    DO i = 1,nc 
+
+        q1 = q(i)-0.5
+        q2 = 0.5*(q1**2-0.25)
+
+        u(i) = (1-s(i))*( (1-r(i))*( ubar(1) + q1*d1(1) + q2*d2(1) )        &
+             +                r(i)*( ubar(2) + q1*d1(2) + q2*d2(2) ) )      &
+             +     s(i)*( (1-r(i))*( ubar(3) + q1*d1(3) + q2*d2(3) )        &
+             +                r(i)*( ubar(4) + q1*d1(4) + q2*d2(4) ) )
+
+        r1 = r(i)-0.5
+        r2 = 0.5*(r1**2-0.25)
+
+        v(i) = (1-s(i))*( (1-q(i))*( ubar(5) + r1*d1(5) + r2*d2(5) )        &
+             +                q(i)*( ubar(6) + r1*d1(6) + r2*d2(6) ) )      &
+             +     s(i)*( (1-q(i))*( ubar(7) + r1*d1(7) + r2*d2(7) )        &
+             +                q(i)*( ubar(8) + r1*d1(8) + r2*d2(8) ) )
+
+        s1 = s(i)-0.5
+        s2 = 0.5*(s1**2-0.25)
+
+        w(i) = (1-q(i))*( (1-r(i))*( ubar(9)  + s1*d1(9)  + s2*d2(9) )      &
+             +                r(i)*( ubar(10) + s1*d1(10) + s2*d2(10) ) )   &
+             +     q(i)*( (1-r(i))*( ubar(11) + s1*d1(11) + s2*d2(11) )     &
+             +                r(i)*( ubar(12) + s1*d1(12) + s2*d2(12) ) )
+
+    END DO
+
+
+    ! check divergence
+    DO i = 1,nc 
+
+        q1 = q(i)-0.5
+        
+        dudx = (1-s(i))*( (1-r(i))*( d1(1) + q1*d2(1) )     &
+             +                r(i)*( d1(2) + q1*d2(2) ) )   &
+             +     s(i)*( (1-r(i))*( d1(3) + q1*d2(3) )     &
+             +                r(i)*( d1(4) + q1*d2(4) ) )
+
+        r1 = r(i)-0.5
+        
+        dvdy = (1-s(i))*( (1-q(i))*( d1(5) + r1*d2(5) )     &
+             +                q(i)*( d1(6) + r1*d2(6) ) )   &
+             +     s(i)*( (1-q(i))*( d1(7) + r1*d2(7) )     &
+             +                q(i)*( d1(8) + r1*d2(8) ) )
+
+        s1 = s(i)-0.5
+        
+        dwdz = (1-q(i))*( (1-r(i))*( d1(9)  + s1*d2(9) )        &
+             +                r(i)*( d1(10) + s1*d2(10) ) )     &
+             +     q(i)*( (1-r(i))*( d1(11) + s1*d2(11) )       &
+             +                r(i)*( d1(12) + s1*d2(12) ) )
+
+        div(i) = dudx + dvdy + dwdz
+
+    END DO
+
+
+END SUBROUTINE perm3d
+
+
+
+SUBROUTINE edge_parameters(ubar,d1,d2,              &
+                           ules,vles,wles,          &
+                           uhat,vhat,what,          &
+                           dhat,vec_theta)
+
+    !USE particle_mod, ONLY: matrix_bplus
+
+    IMPLICIT NONE
+
+    ! Dimension variables
+
+    REAL, INTENT(out) :: ubar(12),d1(12),d2(12)
+    REAL, INTENT(in) :: ules(0:1),vles(0:1),wles(0:1)
+    REAL, INTENT(in) :: uhat(0:1,0:1,0:1)
+    REAL, INTENT(in) :: vhat(0:1,0:1,0:1)
+    REAL, INTENT(in) :: what(0:1,0:1,0:1)
+    REAL, INTENT(in) :: dhat(12),vec_theta(8)
+
+    ! Local
+    REAL :: u(0:1,0:1,0:1),v(0:1,0:1,0:1),w(0:1,0:1,0:1)
+    REAL :: vec_a(8),vec_b(8)
+    REAL :: du(0:1),dv(0:1),dw(0:1)
+    REAL :: dcor(12)
+    REAL :: matrix_bplus(12,8) = reshape((/-0.35  , -0.15  , -0.1375, -0.1125, &
+                                                     0.2375,  0.0125,  0.05  , &
+              -0.05  , -0.25  , -0.25  , -0.4375, -0.3125, -0.0625, -0.1875,  & 
+               0.25  , -0.25  , -0.15  , -0.35  , -0.1125, -0.1375,  0.0125,  &
+               0.2375, -0.05  ,  0.05  , -0.25  , -0.25  , -0.3125, -0.4375,  &
+              -0.1875, -0.0625, -0.25  ,  0.25  , -0.35  , -0.15  ,  0.2375,  &
+               0.0125, -0.1375, -0.1125,  0.05  , -0.05  , -0.25  , -0.25  ,  &
+              -0.0625, -0.1875, -0.4375, -0.3125,  0.25  , -0.25  , -0.15  ,  &
+              -0.35  ,  0.0125,  0.2375, -0.1125, -0.1375, -0.05  ,  0.05  ,  &
+              -0.25  , -0.25  , -0.1875, -0.0625, -0.3125, -0.4375, -0.25  ,  &
+               0.25  , -0.3   ,  0.3   , -0.1   ,  0.1   , -0.1   ,  0.1   ,  &
+              -0.1   ,  0.1   , -0.1   ,  0.1   , -0.325 ,  0.325 , -0.075 ,  &
+               0.075 , -0.2   ,  0.2   , -0.1   ,  0.1   , -0.075 ,  0.075 ,  &
+              -0.325 ,  0.325 , -0.2   ,  0.2   ,  0.5   ,  0.5   ,  0.5   ,  &
+               0.5   ,  0.5   ,  0.5   ,  0.5   ,  0.5    /), (/12,8/))
+
+    LOGICAL :: init = .FALSE.
+    INTEGER :: i,j
+
+    !===========================================================
+
+    ! compute final vertex values
+
+    ! u component west face
+    du(0) = ules(0) - 0.25*( uhat(0,0,0) + uhat(0,0,1) + uhat(0,1,0) + uhat(0,1,1) )
+    u(0,0,0) = uhat(0,0,0) + du(0)
+    u(0,0,1) = uhat(0,0,1) + du(0)
+    u(0,1,0) = uhat(0,1,0) + du(0)
+    u(0,1,1) = uhat(0,1,1) + du(0)
+
+    ! u component east face
+    du(1) = ules(1) - 0.25*( uhat(1,0,0) + uhat(1,0,1) + uhat(1,1,0) + uhat(1,1,1) )
+    u(1,0,0) = uhat(1,0,0) + du(1)
+    u(1,0,1) = uhat(1,0,1) + du(1)
+    u(1,1,0) = uhat(1,1,0) + du(1)
+    u(1,1,1) = uhat(1,1,1) + du(1)
+
+    ! v component south face
+    dv(0) = vles(0) - 0.25*( vhat(0,0,0) + vhat(0,0,1) + vhat(1,0,0) + vhat(1,0,1) )
+    v(0,0,0) = vhat(0,0,0) + dv(0)
+    v(0,0,1) = vhat(0,0,1) + dv(0)
+    v(1,0,0) = vhat(1,0,0) + dv(0)
+    v(1,0,1) = vhat(1,0,1) + dv(0)
+
+    ! v component north face
+    dv(1) = vles(1) - 0.25*( vhat(0,1,0) + vhat(0,1,1) + vhat(1,1,0) + vhat(1,1,1) )
+    v(0,1,0) = vhat(0,1,0) + dv(1)
+    v(0,1,1) = vhat(0,1,1) + dv(1)
+    v(1,1,0) = vhat(1,1,0) + dv(1)
+    v(1,1,1) = vhat(1,1,1) + dv(1)
+
+    ! w component bottom face
+    dw(0) = wles(0) - 0.25*( what(0,0,0) + what(0,1,0) + what(1,0,0) + what(1,1,0) )
+    w(0,0,0) = what(0,0,0) + dw(0)
+    w(0,1,0) = what(0,1,0) + dw(0)
+    w(1,0,0) = what(1,0,0) + dw(0)
+    w(1,1,0) = what(1,1,0) + dw(0)
+
+    ! w component top face
+    dw(1) = wles(1) - 0.25*( what(0,0,1) + what(0,1,1) + what(1,0,1) + what(1,1,1) )
+    w(0,0,1) = what(0,0,1) + dw(1)
+    w(0,1,1) = what(0,1,1) + dw(1)
+    w(1,0,1) = what(1,0,1) + dw(1)
+    w(1,1,1) = what(1,1,1) + dw(1)
+    
+
+    ! parabolic edge velocities
+    ubar(1) = 0.5*( u(1,0,0) + u(0,0,0) )
+    ubar(2) = 0.5*( u(1,1,0) + u(0,1,0) )
+    ubar(3) = 0.5*( u(1,0,1) + u(0,0,1) )
+    ubar(4) = 0.5*( u(1,1,1) + u(0,1,1) )
+
+    ubar(5) = 0.5*( v(0,1,0) + v(0,0,0) )
+    ubar(6) = 0.5*( v(1,1,0) + v(1,0,0) )
+    ubar(7) = 0.5*( v(0,1,1) + v(0,0,1) )
+    ubar(8) = 0.5*( v(1,1,1) + v(1,0,1) )
+
+    ubar(9)  = 0.5*( w(0,0,1) + w(0,0,0) )
+    ubar(10) = 0.5*( w(0,1,1) + w(0,1,0) )
+    ubar(11) = 0.5*( w(1,0,1) + w(1,0,0) )
+    ubar(12) = 0.5*( w(1,1,1) + w(1,1,0) )
+
+
+    ! first-order slopes
+    d1(1) = u(1,0,0) - u(0,0,0)
+    d1(2) = u(1,1,0) - u(0,1,0)
+    d1(3) = u(1,0,1) - u(0,0,1)
+    d1(4) = u(1,1,1) - u(0,1,1)
+
+    d1(5) = v(0,1,0) - v(0,0,0)
+    d1(6) = v(1,1,0) - v(1,0,0)
+    d1(7) = v(0,1,1) - v(0,0,1)
+    d1(8) = v(1,1,1) - v(1,0,1)
+
+    d1(9)  = w(0,0,1) - w(0,0,0)
+    d1(10) = w(0,1,1) - w(0,1,0)
+    d1(11) = w(1,0,1) - w(1,0,0)
+    d1(12) = w(1,1,1) - w(1,1,0)
+
+
+    ! A*d1
+    vec_a(1)  = d1(1) + d1(5) + d1(9)
+    vec_a(2)  = d1(3) + d1(7) + d1(9)
+    vec_a(3)  = d1(2) + d1(5) + d1(10)
+    vec_a(4)  = d1(4) + d1(7) + d1(10)
+    vec_a(5)  = d1(1) + d1(6) + d1(11)
+    vec_a(6)  = d1(3) + d1(8) + d1(11)
+    vec_a(7)  = d1(2) + d1(6) + d1(12)
+    vec_a(8)  = d1(4) + d1(8) + d1(12)
+
+    ! B*dhat
+    vec_b(1)  = -dhat(1) - dhat(5) - dhat(9)
+    vec_b(2)  = -dhat(3) - dhat(7) + dhat(9)
+    vec_b(3)  = -dhat(2) + dhat(5) - dhat(10)
+    vec_b(4)  = -dhat(4) + dhat(7) + dhat(10)
+    vec_b(5)  =  dhat(1) - dhat(6) - dhat(11)
+    vec_b(6)  =  dhat(3) - dhat(8) + dhat(11)
+    vec_b(7)  =  dhat(2) + dhat(6) - dhat(12)
+    vec_b(8)  =  dhat(4) + dhat(8) + dhat(12)
+    
+    vec_b = 0.5*vec_b
+    
+    ! second-order slopes
+    ! matirx_bplus ist the pseudo-inverse of B
+    dcor = MATMUL(matrix_bplus,(vec_theta - vec_a - vec_b))
+    d2 = dhat + dcor
+    
+END SUBROUTINE edge_parameters
 
 
 END MODULE PART
